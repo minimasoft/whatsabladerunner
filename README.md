@@ -19,6 +19,7 @@ $$\lim_{price \to 0} \frac{Utility}{Price} = \infty$$
 
 ### Economics FAQ
 
-**Q: What about the time spent developing whatsabladerunner?**
+#### **Q: What about the time spent developing whatsabladerunner?**
+
 A: All of it is lost, like tears in rain. 
 
