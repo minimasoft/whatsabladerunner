@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -70,7 +71,90 @@ func main() {
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	// List conversations after a short delay to allow connection/sync
+	go func() {
+		time.Sleep(5 * time.Second)
+		listConversations(client)
+	}()
+
 	<-c
 
 	client.Disconnect()
+}
+
+func listConversations(client *whatsmeow.Client) {
+	fmt.Println("Fetching conversations...")
+
+	// List Groups
+	groups, err := client.GetJoinedGroups(context.Background())
+	if err != nil {
+		fmt.Println("Failed to get groups:", err)
+	} else {
+		fmt.Println("Groups:")
+		for _, g := range groups {
+			fmt.Printf("- %s (%s)\n", g.Name, g.JID)
+			fmt.Println("  Participants:")
+			for _, p := range g.Participants {
+				fmt.Printf("    - %s\n", p.JID)
+			}
+
+			// Check chat settings (Unread count not directly available in LocalChatSettings in this version)
+			if client.Store.ChatSettings != nil {
+				settings, err := client.Store.ChatSettings.GetChatSettings(context.Background(), g.JID)
+				if err == nil {
+					if settings.MutedUntil.After(time.Now()) {
+						fmt.Println("  [MUTED]")
+					}
+					if settings.Pinned {
+						fmt.Println("  [PINNED]")
+					}
+					if settings.Archived {
+						fmt.Println("  [ARCHIVED]")
+					}
+				}
+			}
+		}
+	}
+
+	// List Contacts
+	if client.Store.Contacts != nil {
+		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err != nil {
+			fmt.Println("Failed to get contacts:", err)
+		} else {
+			fmt.Println("Contacts:")
+			for jid, info := range contacts {
+				name := info.PushName
+				if name == "" {
+					name = info.FullName
+				}
+				if name == "" {
+					name = info.BusinessName
+				}
+				if name == "" {
+					name = "Unknown"
+				}
+				fmt.Printf("- %s (%s)\n", name, jid)
+
+				// Check chat settings
+				if client.Store.ChatSettings != nil {
+					settings, err := client.Store.ChatSettings.GetChatSettings(context.Background(), jid)
+					if err == nil {
+						if settings.MutedUntil.After(time.Now()) {
+							fmt.Println("  [MUTED]")
+						}
+						if settings.Pinned {
+							fmt.Println("  [PINNED]")
+						}
+						if settings.Archived {
+							fmt.Println("  [ARCHIVED]")
+						}
+					}
+				}
+			}
+		}
+	} else {
+		fmt.Println("Contact store not available")
+	}
 }

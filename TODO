@@ -1,0 +1,2 @@
+- decide if harness will also be implemented in go (probably yes)
+- describe basic abstraction architecture for tasks and behaviors to design a good harness.
