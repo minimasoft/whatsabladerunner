@@ -25,12 +25,17 @@ func eventHandler(evt interface{}) {
 	case *events.Message:
 		fmt.Println("------------------------------------------------")
 		fmt.Printf("Received a message!\n")
-		fmt.Printf("ID: %s\n", v.Info.ID)
+		//fmt.Printf("ID: %s\n", v.Info.ID)
 		fmt.Printf("Time: %s\n", v.Info.Timestamp)
 		fmt.Printf("Sender: %s (PushName: %s)\n", v.Info.Sender, v.Info.PushName)
 		fmt.Printf("Chat: %s\n", v.Info.Chat)
-		if v.Message != nil {
-			fmt.Printf("Content: %+v\n", v.Message)
+		// Check if the message is sent to the current client/account (Note to Self)
+		if v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User {
+			fmt.Println("it's you")
+		}
+
+		if v.Message != nil && v.Message.ExtendedTextMessage != nil {
+			fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
 		}
 		fmt.Println("------------------------------------------------")
 	case *events.HistorySync:
