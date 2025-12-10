@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/mdp/qrterminal/v3"
 
@@ -88,12 +91,28 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	clientLog := waLog.Stdout("Client", "INFO", true)
+	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 	client.AddEventHandler(eventHandler)
 
+	// Configure Identification
+	// deviceStore.Platform = "chrome" // Deprecated or handled by payload? Best to set it for completeness if impactful.
+	// Actually, the Platform field in deviceStore might be "stored" but the payload matters more for the session.
+	// Let's rely on the payload override.
+
+	// Configure Identification
+	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
+	store.DeviceProps.Os = proto.String("Windows")
+	// SetOSInfo updates BaseClientPayload.UserAgent.OsVersion and OsBuildNumber
+	store.SetOSInfo("Windows", [3]uint32{10, 0, 19045})
+
+	// Customize other payload fields
+	store.BaseClientPayload.UserAgent.Manufacturer = proto.String("Microsoft")
+	store.BaseClientPayload.UserAgent.Device = proto.String("Windows")
+
 	if client.Store.ID == nil {
 		// No ID stored, new login
+		fmt.Println("No ID stored, new login")
 		qrChan, _ := client.GetQRChannel(context.Background())
 		err = client.Connect()
 		if err != nil {
