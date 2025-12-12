@@ -1,4 +1,8 @@
-# Architecture
+# Whatsabladerunner design
+
+## TL;DR;
+
+It's a bot that you command in WhatsApp self-chat so the bot can talk for you in other conversations.
 
 ## Code
 
