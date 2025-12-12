@@ -1,30 +1,27 @@
-# Whatsabladerunner design
+# Whatsabladerunner Design
 
-## TL;DR;
-
-It's a bot that you command in WhatsApp self-chat so the bot can talk for you in other conversations.
+## TL;DR
+It is a bot that you command via WhatsApp self-chat, allowing the bot to speak on your behalf in other conversations.
 
 ## Code
 
-This is simple: event based with concurrency and trying to apply good golang practices (I know little of them so probably not following them).
+The architecture is simple: event-based with concurrency, aiming to apply idiomatic Go practices.
 
 There are only two key parts:
 
-### 1. Integration with whatsmeow for whatsapp comms
+### 1. Integration with `whatsmeow` for WhatsApp communications
 
-This just follows events from whatsmeow and forwards what's required to the bot core.
+This component follows events from `whatsmeow` and forwards required information to the bot core.
 
-### 2. Bot core
+### 2. Bot Core
 
-The bot core will apply pre-set prompt workflows to the events received and forward the responses to whatsmeow.
+The bot core applies pre-set prompt workflows to the received events and forwards the responses to `whatsmeow`.
 
-Each step of the state machine that represents a workflow will be a event to allow extensibility and easy testing.
-
-Event trees should be documented.
+Each step of the state machine representing a workflow will be an event to allow extensibility and easy testing. Event trees should be documented.
 
 ## Governance
 
-whatsabladerunner, or "Blady" from now on, is governed by the user using three key elements:
+Whatsabladerunner (referred to as "Blady" from now on) is governed by the user using three key elements:
 
 1. Tasks
 2. Behaviors
@@ -36,37 +33,38 @@ The user asks Blady to talk to a contact or group with a specific goal.
 
 Blady will create a task and confirm it with the user.
 
-Once a task is confirmed Blady will gather information (read the conversation log, ask for missing information, etc.) and start chatting.
+Once a task is confirmed, Blady will gather information (read the conversation log, ask for missing information, etc.) and start chatting.
 
-After every response Blady will evaluate and document task progress and continue chatting until the task is finished or blocked.
+After every response, Blady will evaluate and document task progress, continuing to chat until the task is finished or blocked.
 
 ### 2. Behaviors
 
-The user programs Blady with behaviors and then can enable those behaviors in conversations.
+The user programs Blady with behaviors, which can then be enabled in specific conversations.
 
-Once a behavior is enabled Blady will evaluate every message in the conversation with it until disabled.
+Once a behavior is enabled, Blady will evaluate every message in the conversation against that behavior until it is disabled.
 
 ### 3. Watchers
 
-Blady is not responsible for its actions "he is just following orders".
+Blady is not responsible for its actions; it is "just following orders."
 
-Watchers will inspect every action Blady wants to execute (includes messages to send) and evaluate if it should be allowed to proceed or not.
+Watchers will inspect every action Blady attempts to execute (including sending messages) and evaluate if it should be allowed to proceed.
 
-If a watcher decides to block an action it will inform to the user the action blocked and the reason.
+If a watcher decides to block an action, it will inform the user of the blocked action and the reason.
 
 The user can decide to:
-a. Accept the block and stop Blady from proceeding.
-b. Ask Blady to try again.
-c. Overrule the watcher and allow the action to proceed.
 
-Exceptionally a task can be programmed to always do A or B but not C (well, actually you can but it will be highly discouraged).
+1. Accept the block and stop Blady from proceeding.
+2. Ask Blady to try again.
+3. Overrule the watcher and allow the action to proceed.
 
-## Config and execution
+Exceptionally, a task can be programmed to always do **1** or **2**, but not **3** (while this is possible, it is **highly** discouraged).
 
-The config (tasks, behavoirs, watchers) will be stored in plain text in a structured directory.
+## Config and Execution
+
+The configuration (tasks, behaviors, watchers) will be stored in plain text in a structured directory.
 
 While new tasks and behaviors can be created by the user talking to Blady, watchers can only be modified by the user directly editing the files.
 
-whatsabladerunner will run locally from the terminal and by default will use local LLMs and sqlite storage.
+Whatsabladerunner will run locally from the terminal and, by default, will use local LLMs and SQLite storage.
 
 The user can configure remote LLM providers.
