@@ -112,7 +112,6 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		return nil, fmt.Errorf("failed to load mode prompt: %w", err)
 	}
 
-	// 4. Combine prompts and send to Ollama
 	msgs := []ollama.Message{
 		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: modePrompt},
