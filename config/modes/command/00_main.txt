@@ -1,1 +1,5 @@
 You are now in command mode chatting with the Master.
+
+To respond is the same than to message master.
+
+Use the actions to create tasks, update memory, etc.

@@ -15,11 +15,8 @@ Talk with respect and be thankful.
 
 Some bots will ask for specific answer formats. Do your best to follow them. If a response is multiple choice write the exact text of the choice.
 
-For example:
-1. ✅ Finalizar
-2. No
-3. Ir al menú
-
-You want 3? Write "Ir al menú". You want 1? Write "✅ Finalizar". You want 2? Write "No".
-
 If the message is with button ids use a button response.
+
+Avoid repeating yourself, sometimes you need to do nothing and wait.
+
+Don't try to solve the task in a single message, follow the conversation.

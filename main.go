@@ -44,6 +44,16 @@ var (
 	taskBot        *bot.Bot // Global bot instance for task handling
 )
 
+// ButtonsContext stores the context needed for button responses
+type ButtonsContext struct {
+	MessageID   string
+	Participant string
+	Message     *waProto.Message
+}
+
+// lastButtonsMessage stores the last buttons/list message per chat for context
+var lastButtonsMessage = make(map[string]*ButtonsContext)
+
 const BotPrefix = "[Blady] : "
 
 func eventHandler(evt interface{}) {
@@ -93,6 +103,43 @@ func eventHandler(evt interface{}) {
 						msgText += fmt.Sprintf("\n- \"%s\" -> buttonID: %s", displayText, buttonID)
 					}
 				}
+				// Store buttons context for later response
+				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+					MessageID:   v.Info.ID,
+					Participant: v.Info.Sender.String(),
+					Message:     v.Message,
+				}
+				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s\n", v.Info.ID, v.Info.Chat.String())
+			} else if v.Message.ListMessage != nil {
+				// Handle list message (dropdown options)
+				lm := v.Message.ListMessage
+				if lm.Description != nil {
+					msgText = *lm.Description
+				}
+				// Extract list sections and rows
+				if len(lm.Sections) > 0 {
+					msgText += "\n\n[Opciones de lista - responder con el rowID JSON]:"
+					for _, section := range lm.Sections {
+						for _, row := range section.Rows {
+							title := ""
+							rowID := ""
+							if row.Title != nil {
+								title = *row.Title
+							}
+							if row.RowID != nil {
+								rowID = *row.RowID
+							}
+							msgText += fmt.Sprintf("\n- \"%s\" -> rowID: %s", title, rowID)
+						}
+					}
+				}
+				// Store list context for later response
+				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+					MessageID:   v.Info.ID,
+					Participant: v.Info.Sender.String(),
+					Message:     v.Message,
+				}
+				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s\n", v.Info.ID, v.Info.Chat.String())
 			}
 		}
 
@@ -242,9 +289,24 @@ func eventHandler(evt interface{}) {
 						}
 
 						// Button response function for task conversation
+						// Uses stored buttons context for full quotedMessage support
+						chatJIDForContext := v.Info.Chat.String()
 						sendButtonResponse := func(displayText, buttonID string) {
 							if whatsAppClient != nil {
-								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s\n", displayText, buttonID)
+								// Get stored buttons context
+								btnCtx := lastButtonsMessage[chatJIDForContext]
+								if btnCtx == nil {
+									fmt.Printf("[ButtonResponse] No buttons context found for chat %s, falling back to text\n", chatJIDForContext)
+									// Fallback to regular text response
+									whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+										Conversation: proto.String(displayText),
+									})
+									return
+								}
+
+								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s\n",
+									displayText, buttonID, btnCtx.MessageID, btnCtx.Participant)
+
 								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
 									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 										SelectedButtonID: proto.String(buttonID),
@@ -252,6 +314,11 @@ func eventHandler(evt interface{}) {
 											SelectedDisplayText: displayText,
 										},
 										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
+										ContextInfo: &waProto.ContextInfo{
+											StanzaID:      proto.String(btnCtx.MessageID),
+											Participant:   proto.String(btnCtx.Participant),
+											QuotedMessage: btnCtx.Message,
+										},
 									},
 								})
 								if err != nil {
@@ -379,7 +446,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	clientLog := waLog.Stdout("Client", "INFO", true)
+	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	whatsAppClient = whatsmeow.NewClient(deviceStore, clientLog)
 	client := whatsAppClient
 
@@ -461,9 +528,24 @@ func main() {
 		}
 
 		// Create button response function for this contact
+		// Uses stored buttons context for full quotedMessage support
+		contactChatID := task.Contact
 		sendButtonResponse := func(displayText, buttonID string) {
 			if whatsAppClient != nil {
-				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s\n", displayText, buttonID)
+				// Get stored buttons context
+				btnCtx := lastButtonsMessage[contactChatID]
+				if btnCtx == nil {
+					fmt.Printf("[ButtonResponse] No buttons context found for chat %s, falling back to text\n", contactChatID)
+					// Fallback to regular text response
+					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+						Conversation: proto.String(displayText),
+					})
+					return
+				}
+
+				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s\n",
+					displayText, buttonID, btnCtx.MessageID, btnCtx.Participant)
+
 				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
 					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 						SelectedButtonID: proto.String(buttonID),
@@ -471,6 +553,11 @@ func main() {
 							SelectedDisplayText: displayText,
 						},
 						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
+						ContextInfo: &waProto.ContextInfo{
+							StanzaID:      proto.String(btnCtx.MessageID),
+							Participant:   proto.String(btnCtx.Participant),
+							QuotedMessage: btnCtx.Message,
+						},
 					},
 				})
 				if err != nil {

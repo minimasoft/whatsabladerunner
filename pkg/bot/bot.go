@@ -84,7 +84,7 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 		{Role: "user", Content: watcherPrompt},
 	}
 
-	fmt.Printf("DEBUG: Sending to Watcher:\n--- System Prompt ---\n%s\n--- Watcher Prompt ---\n%s\n---------------------\n", sysPrompt, watcherPrompt)
+	///fmt.Printf("DEBUG: Sending to Watcher:\n--- System Prompt ---\n%s\n--- Watcher Prompt ---\n%s\n---------------------\n", sysPrompt, watcherPrompt)
 
 	respMsg, err := b.Client.Chat(msgs, nil)
 	if err != nil {
@@ -150,7 +150,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		{Role: "user", Content: modePrompt},
 	}
 
-	fmt.Printf("DEBUG: Sending to Ollama:\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
+	//fmt.Printf("DEBUG: Sending to Ollama:\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
 
 	// Note: Client uses default options (Temperature 0.13, etc)
 	respMsg, err := b.Client.Chat(msgs, nil)
@@ -174,7 +174,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	botResp := &BotResponse{}
 
 	// 6. Execute Actions
-	for _, rawAction := range rawResp.Actions {
+	for i, rawAction := range rawResp.Actions {
 		// Parse content as string for most actions
 		var contentStr string
 		if rawAction.Content != nil {
@@ -184,6 +184,8 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 				contentStr = string(rawAction.Content)
 			}
 		}
+
+		fmt.Printf("[Bot] Processing action %d: type=%s\n", i+1, rawAction.Type)
 
 		switch rawAction.Type {
 		case "memory_update":
@@ -307,19 +309,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		return nil, fmt.Errorf("failed to read memories: %w", err)
 	}
 
-	// 3. Load Tasks
-	activeTasks, err := b.TaskManager.LoadActiveTasks()
-	if err != nil {
-		fmt.Printf("Warning: failed to load tasks: %v\n", err)
-		activeTasks = []tasks.Task{}
-	}
-	tasksJSON, err := json.Marshal(activeTasks)
-	if err != nil {
-		fmt.Printf("Warning: failed to marshal tasks: %v\n", err)
-		tasksJSON = []byte("[]")
-	}
-
-	// 4. Marshal current task for template
+	// 3. Marshal current task for template (no other tasks needed in task mode)
 	currentTaskJSON, err := json.MarshalIndent(task, "", "  ")
 	if err != nil {
 		fmt.Printf("Warning: failed to marshal current task: %v\n", err)
@@ -327,10 +317,11 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	}
 
 	// 5. Load Mode Prompt (task mode)
+	// Send empty tasks and contacts to focus on current task
 	modeData := prompt.ModeData{
 		Memories:    string(memoriesContent),
-		Tasks:       string(tasksJSON),
-		Contacts:    b.Contacts,
+		Tasks:       "[]", // Empty to focus on current task
+		Contacts:    "[]", // Empty to focus on conversation
 		Context:     strings.Join(context, "\n"),
 		Message:     msg,
 		CurrentTask: string(currentTaskJSON),
@@ -345,7 +336,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		{Role: "user", Content: modePrompt},
 	}
 
-	fmt.Printf("DEBUG: Sending to Ollama (Task Mode):\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
+	//fmt.Printf("DEBUG: Sending to Ollama (Task Mode):\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
 
 	respMsg, err := b.Client.Chat(msgs, nil)
 	if err != nil {
@@ -367,13 +358,15 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	botResp := &BotResponse{}
 
 	// 7. Execute Actions
-	for _, rawAction := range rawResp.Actions {
+	for i, rawAction := range rawResp.Actions {
 		var contentStr string
 		if rawAction.Content != nil {
 			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
 				contentStr = string(rawAction.Content)
 			}
 		}
+
+		fmt.Printf("[Bot/Task] Processing action %d: type=%s\n", i+1, rawAction.Type)
 
 		switch rawAction.Type {
 		case "memory_update":
