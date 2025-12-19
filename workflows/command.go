@@ -40,10 +40,10 @@ type CommandWorkflow struct {
 	SendFunc func(string)
 }
 
-func NewCommandWorkflow(client *ollama.Client, sendFunc func(string)) *CommandWorkflow {
+func NewCommandWorkflow(client *ollama.Client, sendFunc func(string), sendMasterFunc func(string)) *CommandWorkflow {
 	// Assuming config is in "config" dir relative to CWD
 	// Pass sendFunc to Bot so it can handle response actions.
-	b := bot.NewBot(client, "config", sendFunc)
+	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc)
 	return &CommandWorkflow{
 		Bot:      b,
 		SendFunc: sendFunc,

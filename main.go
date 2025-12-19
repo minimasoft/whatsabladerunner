@@ -89,7 +89,35 @@ func eventHandler(evt interface{}) {
 						var contextMsgs []string
 						// TODO: Implement actual history fetching locally if needed.
 
-						wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc)
+						sendMasterFunc := func(msg string) {
+							// For "Note to Self" (User == Sender.User), message_master is just a response back to the chat.
+							// But specifically, we can ensure it goes to the user.
+							// In this context, v.Info.Chat is the user's chat.
+							if whatsAppClient != nil {
+								// We can prefix it to distinguish slightly if we want, or rely on normal sending.
+								// The SendFunc above prefixes with '[Blady] : '.
+								// If 'message_master' is meant to be private, it's already private in "Note to Self".
+								// If we are in a group, this should go to a private chat with the user.
+								// But v.Info.Chat might be a group.
+								// So we should construct a JID for the user.
+
+								// v.Info.Sender is the JID of the sender.
+								// If v.Info.IsFromMe, Sender is us. Wait.
+								// If I (me) send a note to self, v.Info.Sender is My JID. v.Info.Chat is My JID (as User).
+								// So targeting v.Info.Sender is correct for replying to the "Master".
+
+								targetJID := v.Info.Sender
+
+								_, err := whatsAppClient.SendMessage(context.Background(), targetJID, &waProto.Message{
+									Conversation: proto.String(msg),
+								})
+								if err != nil {
+									fmt.Printf("Failed to send master message: %v\n", err)
+								}
+							}
+						}
+
+						wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc)
 						wf.Run(ctx, text, contextMsgs)
 					})
 				} else {

@@ -14,22 +14,24 @@ type Bot struct {
 	Client        *ollama.Client
 	PromptManager *prompt.PromptManager
 	ConfigDir     string
-	SendFunc      func(string)
+
+	SendFunc       func(string)
+	SendMasterFunc func(string)
 }
 
-func NewBot(client *ollama.Client, configDir string, sendFunc func(string)) *Bot {
+func NewBot(client *ollama.Client, configDir string, sendFunc func(string), sendMasterFunc func(string)) *Bot {
 	return &Bot{
-		Client:        client,
-		PromptManager: prompt.NewPromptManager(configDir),
-		ConfigDir:     configDir,
-		SendFunc:      sendFunc,
+		Client:         client,
+		PromptManager:  prompt.NewPromptManager(configDir),
+		ConfigDir:      configDir,
+		SendFunc:       sendFunc,
+		SendMasterFunc: sendMasterFunc,
 	}
 }
 
 type Action struct {
-	Type     string `json:"type"`
-	Memories string `json:"memories,omitempty"`
-	Response string `json:"response,omitempty"`
+	Type    string `json:"type"`
+	Content string `json:"content"`
 }
 
 type BotResponse struct {
@@ -105,15 +107,19 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	// 6. Execute Actions
 	for _, action := range botResp.Actions {
 		if action.Type == "memory_update" {
-			if err := os.WriteFile(memoriesPath, []byte(action.Memories), 0644); err != nil {
+			if err := os.WriteFile(memoriesPath, []byte(action.Content), 0644); err != nil {
 				fmt.Printf("Failed to update memories: %v\n", err)
 			} else {
 				fmt.Println("Memories updated.")
 			}
 		} else if action.Type == "response" {
 			if b.SendFunc != nil {
-				finalMsg := "[Blady] : " + action.Response
+				finalMsg := "[Blady] : " + action.Content
 				b.SendFunc(finalMsg)
+			}
+		} else if action.Type == "message_master" {
+			if b.SendMasterFunc != nil {
+				b.SendMasterFunc(action.Content)
 			}
 		}
 	}
