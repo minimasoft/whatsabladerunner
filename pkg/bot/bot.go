@@ -17,15 +17,17 @@ type Bot struct {
 
 	SendFunc       func(string)
 	SendMasterFunc func(string)
+	Contacts       string // JSON formatted string of contacts
 }
 
-func NewBot(client *ollama.Client, configDir string, sendFunc func(string), sendMasterFunc func(string)) *Bot {
+func NewBot(client *ollama.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
 	return &Bot{
 		Client:         client,
 		PromptManager:  prompt.NewPromptManager(configDir),
 		ConfigDir:      configDir,
 		SendFunc:       sendFunc,
 		SendMasterFunc: sendMasterFunc,
+		Contacts:       contacts,
 	}
 }
 
@@ -104,6 +106,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	modeData := prompt.ModeData{
 		Memories: string(memoriesContent),
 		Tasks:    "[]", // Default empty tasks
+		Contacts: b.Contacts,
 		Context:  strings.Join(context, "\n"),
 		Message:  msg,
 	}

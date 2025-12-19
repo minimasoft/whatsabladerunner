@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -145,7 +146,7 @@ func eventHandler(evt interface{}) {
 						}
 					}
 
-					wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc)
+					wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient))
 					wf.Run(ctx, msgText, contextMsgs)
 				})
 			} else {
@@ -391,4 +392,53 @@ func listStoredConversations(client *whatsmeow.Client) {
 	} else {
 		fmt.Println("Contact store not available")
 	}
+}
+
+type ContactEntry struct {
+	Name   string `json:"name"`
+	Number string `json:"number"`
+}
+
+func getAllContactsJSON(client *whatsmeow.Client) string {
+	var contacts []ContactEntry
+
+	// Groups
+	groups, err := client.GetJoinedGroups(context.Background())
+	if err == nil {
+		for _, g := range groups {
+			contacts = append(contacts, ContactEntry{
+				Name:   g.Name,
+				Number: g.JID.String(),
+			})
+		}
+	}
+
+	// Contacts
+	if client.Store.Contacts != nil {
+		allContacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err == nil {
+			for jid, info := range allContacts {
+				name := info.PushName
+				if name == "" {
+					name = info.FullName
+				}
+				if name == "" {
+					name = info.BusinessName
+				}
+				if name == "" {
+					name = "Unknown"
+				}
+				contacts = append(contacts, ContactEntry{
+					Name:   name,
+					Number: jid.String(),
+				})
+			}
+		}
+	}
+
+	data, err := json.Marshal(contacts)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
 }

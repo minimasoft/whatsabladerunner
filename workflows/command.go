@@ -38,15 +38,17 @@ func (s *BotProcessStep) Execute(ctx context.Context, input interface{}) (interf
 type CommandWorkflow struct {
 	Bot      *bot.Bot
 	SendFunc func(string)
+	Contacts string
 }
 
-func NewCommandWorkflow(client *ollama.Client, sendFunc func(string), sendMasterFunc func(string)) *CommandWorkflow {
+func NewCommandWorkflow(client *ollama.Client, sendFunc func(string), sendMasterFunc func(string), contacts string) *CommandWorkflow {
 	// Assuming config is in "config" dir relative to CWD
 	// Pass sendFunc to Bot so it can handle response actions.
-	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc)
+	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc, contacts)
 	return &CommandWorkflow{
 		Bot:      b,
 		SendFunc: sendFunc,
+		Contacts: contacts,
 	}
 }
 

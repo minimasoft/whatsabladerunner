@@ -18,6 +18,7 @@ type SystemData struct {
 type ModeData struct {
 	Memories string
 	Tasks    string // JSON string
+	Contacts string // JSON string
 	Context  string
 	Message  string
 }
