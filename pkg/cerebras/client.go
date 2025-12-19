@@ -85,8 +85,8 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 		Messages:        messages,
 		Stream:          false,
 		MaxTokens:       32768,
-		Temperature:     1,
-		TopP:            1,
+		Temperature:     0.2,
+		TopP:            0.95,
 		ReasoningEffort: "medium",
 	}
 
@@ -152,8 +152,20 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 			lastErr = fmt.Errorf("HTTP %s: %s", resp.Status, string(body))
 		}
 
-		fmt.Printf("[Cerebras] Attempt %d failed: %v. Retrying in 2s...\n", attempt, lastErr)
-		time.Sleep(2 * time.Second)
+		backoff := 0 * time.Second
+		switch attempt {
+		case 1:
+			backoff = 7 * time.Second
+		case 2:
+			backoff = 29 * time.Second
+		}
+
+		if attempt < 3 {
+			fmt.Printf("[Cerebras] Attempt %d failed: %v. Retrying in %v...\n", attempt, lastErr, backoff)
+			time.Sleep(backoff)
+		} else {
+			fmt.Printf("[Cerebras] Attempt %d failed: %v.\n", attempt, lastErr)
+		}
 	}
 
 	return nil, fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
