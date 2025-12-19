@@ -10,7 +10,7 @@ Your response must be a single JSON object.
 This is a special type that has a dict content instead of string, it contains objective and contact to create, if unsure about the contact confirm with the user.
 Additional field `original_orders` should copy all the order details as written by the user originally. The contact field is strictly the number@whatsap and not any text. 
 Only create the task when all information is available.
-- `delete_task`: A task to be deleted from the task list. Content is ID.
+- `delete_task`: A task to be deleted from the task list. Content is ID. ONLY BY USER REQUEST.
 - `confirm_task`: The user confirmed a newly created task so we can start working on it. Content is ID.
 - `pause_task`: The user paused a task. Content is ID.
 - `resume_task`: The user resumed a task. Content is ID.

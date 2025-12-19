@@ -59,6 +59,7 @@ func eventHandler(evt interface{}) {
 		fmt.Printf("  IsFromMe: %v\n", v.Info.IsFromMe)
 		fmt.Printf("  IsGroup: %v\n", v.Info.IsGroup)
 		fmt.Printf("  MessageSource: %+v\n", v.Info.MessageSource)
+		fmt.Printf("DEBUG: Message Struct: %+v\n", v.Message)
 
 		// Save message to history
 		// We want to save ALL text messages to history to have a full log.
@@ -71,6 +72,21 @@ func eventHandler(evt interface{}) {
 				msgText = *v.Message.ExtendedTextMessage.Text
 			} else if v.Message.Conversation != nil {
 				msgText = *v.Message.Conversation
+			} else if v.Message.ButtonsMessage != nil {
+				// Handle buttons message - extract content text and button options
+				bm := v.Message.ButtonsMessage
+				if bm.ContentText != nil {
+					msgText = *bm.ContentText
+				}
+				// Append button options as formatted text
+				if len(bm.Buttons) > 0 {
+					msgText += "\n\n[Opciones de respuesta]:"
+					for i, btn := range bm.Buttons {
+						if btn.ButtonText != nil && btn.ButtonText.DisplayText != nil {
+							msgText += fmt.Sprintf("\n%d. %s", i+1, *btn.ButtonText.DisplayText)
+						}
+					}
+				}
 			}
 		}
 
@@ -177,6 +193,7 @@ func eventHandler(evt interface{}) {
 
 			if msgText != "" && taskBot != nil {
 				// Check by both chat ID and contact for task matching
+				fmt.Printf("DEBUG: Checking for task with chat ID: %s\n", chatJID)
 				task, err := taskBot.TaskManager.GetTaskByContact(chatJID)
 				if err != nil {
 					fmt.Printf("Error checking for task: %v\n", err)
