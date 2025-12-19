@@ -274,3 +274,86 @@ func (tm *TaskManager) ResumeTask(id int) error {
 	fmt.Printf("[TaskManager] Resumed task %d: status changed to %s\n", id, task.Status)
 	return nil
 }
+
+// GetTaskByContact finds an active (running or pending) task for the given contact
+func (tm *TaskManager) GetTaskByContact(contact string) (*Task, error) {
+	entries, err := os.ReadDir(tm.TasksDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read tasks directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".json") || name == "0_sample.json" {
+			continue
+		}
+
+		filePath := filepath.Join(tm.TasksDir, name)
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		var task Task
+		if err := json.Unmarshal(data, &task); err != nil {
+			continue
+		}
+
+		// Check if this task is for the contact and is active (running or pending)
+		if task.Contact == contact && (task.Status == StatusRunning || task.Status == StatusPending) {
+			return &task, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// SetTaskRunning changes task status from pending to running
+func (tm *TaskManager) SetTaskRunning(id int) error {
+	task, err := tm.LoadTask(id)
+	if err != nil {
+		return err
+	}
+
+	if task.Status != StatusPending {
+		// Already running or in another state, just return
+		if task.Status == StatusRunning {
+			return nil
+		}
+		return fmt.Errorf("task %d is not pending (current status: %s)", id, task.Status)
+	}
+
+	task.Status = StatusRunning
+	if err := tm.SaveTask(task); err != nil {
+		return err
+	}
+
+	fmt.Printf("[TaskManager] Task %d now running\n", id)
+	return nil
+}
+
+// ConfirmTaskAndGet changes status from unconfirmed to pending and returns the task
+func (tm *TaskManager) ConfirmTaskAndGet(id int) (*Task, error) {
+	task, err := tm.LoadTask(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if task.Status != StatusUnconfirmed {
+		return nil, fmt.Errorf("task %d is not unconfirmed (current status: %s)", id, task.Status)
+	}
+
+	task.Status = StatusPending
+	if err := tm.SaveTask(task); err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("[TaskManager] Confirmed task %d: status changed to %s\n", id, task.Status)
+	return task, nil
+}

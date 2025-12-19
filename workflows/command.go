@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"whatsabladerunner/pkg/bot"
 	"whatsabladerunner/pkg/ollama"
+	"whatsabladerunner/pkg/tasks"
 	"whatsabladerunner/pkg/workflow"
 )
 
@@ -41,10 +42,11 @@ type CommandWorkflow struct {
 	Contacts string
 }
 
-func NewCommandWorkflow(client *ollama.Client, sendFunc func(string), sendMasterFunc func(string), contacts string) *CommandWorkflow {
+func NewCommandWorkflow(client *ollama.Client, sendFunc func(string), sendMasterFunc func(string), contacts string, startTaskCallback func(*tasks.Task)) *CommandWorkflow {
 	// Assuming config is in "config" dir relative to CWD
 	// Pass sendFunc to Bot so it can handle response actions.
 	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc, contacts)
+	b.StartTaskCallback = startTaskCallback
 	return &CommandWorkflow{
 		Bot:      b,
 		SendFunc: sendFunc,

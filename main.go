@@ -18,13 +18,16 @@ import (
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
 	"whatsabladerunner/pkg/agent"
+	"whatsabladerunner/pkg/bot"
 	"whatsabladerunner/pkg/history"
 	"whatsabladerunner/pkg/ollama"
+	"whatsabladerunner/pkg/tasks"
 	"whatsabladerunner/workflows"
 )
 
@@ -33,6 +36,7 @@ var (
 	convManager    *agent.ConversationManager
 	whatsAppClient *whatsmeow.Client
 	historyStore   *history.HistoryStore
+	taskBot        *bot.Bot // Global bot instance for task handling
 )
 
 const BotPrefix = "[Blady] : "
@@ -146,13 +150,64 @@ func eventHandler(evt interface{}) {
 						}
 					}
 
-					wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient))
+					wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback)
 					wf.Run(ctx, msgText, contextMsgs)
 				})
 			} else {
 				fmt.Println("DEBUG: No text found in message")
 			}
 		} else {
+			// Not a self-message - check if there's an active task for this contact
+			if msgText != "" && taskBot != nil {
+				senderJID := v.Info.Chat.String() // Use Chat JID to match task contact
+				task, err := taskBot.TaskManager.GetTaskByContact(senderJID)
+				if err != nil {
+					fmt.Printf("Error checking for task: %v\n", err)
+				} else if task != nil {
+					fmt.Printf("Active task %d found for contact %s - routing to task mode\n", task.ID, senderJID)
+
+					// Route to task mode
+					chatID := v.Info.Chat.String()
+					convManager.StartWorkflow(chatID, func(ctx context.Context) {
+						// Fetch context for task conversation
+						contextMsgs, err := historyStore.GetRecentMessages(chatID, 9)
+						if err != nil {
+							fmt.Printf("Failed to get recent messages: %v\n", err)
+							contextMsgs = []string{}
+						}
+
+						// Send function for task conversation (no [Blady] prefix)
+						sendToContact := func(msg string) {
+							if whatsAppClient != nil {
+								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									Conversation: proto.String(msg),
+								})
+								if err != nil {
+									fmt.Printf("Failed to send task message: %v\n", err)
+								} else {
+									err := historyStore.SaveMessage(resp.ID, chatID, "Me", msg, time.Now(), true)
+									if err != nil {
+										fmt.Printf("Failed to save task response to history: %v\n", err)
+									}
+								}
+							}
+						}
+
+						// Reload task to get current status
+						currentTask, err := taskBot.TaskManager.LoadTask(task.ID)
+						if err != nil {
+							fmt.Printf("Failed to reload task: %v\n", err)
+							return
+						}
+
+						_, err = taskBot.ProcessTask(currentTask, msgText, contextMsgs, sendToContact)
+						if err != nil {
+							fmt.Printf("Task processing failed: %v\n", err)
+						}
+					})
+				}
+			}
+
 			if v.Message != nil && v.Message.ExtendedTextMessage != nil {
 				fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
 			}
@@ -260,6 +315,52 @@ func main() {
 	historyStore, err = history.New("history.db")
 	if err != nil {
 		panic(err)
+	}
+
+	// Initialize task bot with StartTaskCallback
+	// This callback is triggered when a task is confirmed via confirm_task action
+	taskBot = bot.NewBot(ollamaClient, "config", nil, nil, getAllContactsJSON(client))
+	taskBot.StartTaskCallback = func(task *tasks.Task) {
+		fmt.Printf("[TaskManager] Starting task %d for contact %s\n", task.ID, task.Contact)
+
+		// Parse contact JID
+		contactJID, err := types.ParseJID(task.Contact)
+		if err != nil {
+			fmt.Printf("Failed to parse contact JID %s: %v\n", task.Contact, err)
+			return
+		}
+
+		// Get conversation context for the task contact
+		contextMsgs, err := historyStore.GetRecentMessages(task.Contact, 9)
+		if err != nil {
+			fmt.Printf("Failed to get context for task contact: %v\n", err)
+			contextMsgs = []string{}
+		}
+
+		// Create send function for this contact
+		sendToContact := func(msg string) {
+			if whatsAppClient != nil {
+				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+					Conversation: proto.String(msg),
+				})
+				if err != nil {
+					fmt.Printf("Failed to send task message: %v\n", err)
+				} else {
+					err := historyStore.SaveMessage(resp.ID, task.Contact, "Me", msg, time.Now(), true)
+					if err != nil {
+						fmt.Printf("Failed to save task response to history: %v\n", err)
+					}
+				}
+			}
+		}
+
+		// Process task with empty message (initial prompt)
+		go func() {
+			_, err := taskBot.ProcessTask(task, "", contextMsgs, sendToContact)
+			if err != nil {
+				fmt.Printf("Task initial processing failed: %v\n", err)
+			}
+		}()
 	}
 
 	client.AddEventHandler(eventHandler)

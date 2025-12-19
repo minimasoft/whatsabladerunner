@@ -18,9 +18,10 @@ type Bot struct {
 	TaskManager   *tasks.TaskManager
 	ConfigDir     string
 
-	SendFunc       func(string)
-	SendMasterFunc func(string)
-	Contacts       string // JSON formatted string of contacts
+	SendFunc          func(string)
+	SendMasterFunc    func(string)
+	Contacts          string            // JSON formatted string of contacts
+	StartTaskCallback func(*tasks.Task) // Called when a task is confirmed to start it
 }
 
 func NewBot(client *ollama.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
@@ -249,8 +250,12 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 				fmt.Printf("Failed to parse confirm_task ID: %v\n", err)
 				continue
 			}
-			if err := b.TaskManager.ConfirmTask(id); err != nil {
+			task, err := b.TaskManager.ConfirmTaskAndGet(id)
+			if err != nil {
 				fmt.Printf("Failed to confirm task %d: %v\n", id, err)
+			} else if b.StartTaskCallback != nil {
+				// Trigger task start callback
+				b.StartTaskCallback(task)
 			}
 
 		case "pause_task":
@@ -275,6 +280,147 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 
 		default:
 			fmt.Printf("Unknown action type: %s\n", rawAction.Type)
+		}
+	}
+
+	return botResp, nil
+}
+
+// ProcessTask processes a message in task mode for a specific task
+// It sets CurrentTask in the mode data and transitions task to running on first response
+func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendToContact func(string)) (*BotResponse, error) {
+	// 1. Load System Prompt
+	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load system prompt: %w", err)
+	}
+
+	// 2. Load Memories
+	memoriesPath := filepath.Join(b.ConfigDir, "memories.txt")
+	memoriesContent, err := os.ReadFile(memoriesPath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to read memories: %w", err)
+	}
+
+	// 3. Load Tasks
+	activeTasks, err := b.TaskManager.LoadActiveTasks()
+	if err != nil {
+		fmt.Printf("Warning: failed to load tasks: %v\n", err)
+		activeTasks = []tasks.Task{}
+	}
+	tasksJSON, err := json.Marshal(activeTasks)
+	if err != nil {
+		fmt.Printf("Warning: failed to marshal tasks: %v\n", err)
+		tasksJSON = []byte("[]")
+	}
+
+	// 4. Marshal current task for template
+	currentTaskJSON, err := json.MarshalIndent(task, "", "  ")
+	if err != nil {
+		fmt.Printf("Warning: failed to marshal current task: %v\n", err)
+		currentTaskJSON = []byte("{}")
+	}
+
+	// 5. Load Mode Prompt (task mode)
+	modeData := prompt.ModeData{
+		Memories:    string(memoriesContent),
+		Tasks:       string(tasksJSON),
+		Contacts:    b.Contacts,
+		Context:     strings.Join(context, "\n"),
+		Message:     msg,
+		CurrentTask: string(currentTaskJSON),
+	}
+	modePrompt, err := b.PromptManager.LoadModePrompt("task", modeData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load task mode prompt: %w", err)
+	}
+
+	msgs := []ollama.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: modePrompt},
+	}
+
+	fmt.Printf("DEBUG: Sending to Ollama (Task Mode):\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
+
+	respMsg, err := b.Client.Chat(msgs, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ollama chat failed: %w", err)
+	}
+
+	// 6. Parse Response
+	fmt.Printf("DEBUG: Raw Ollama Response (Task Mode):\n%s\n---------------------\n", respMsg.Content)
+
+	content := respMsg.Content
+	content = cleanJSON(content)
+
+	var rawResp RawBotResponse
+	if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
+		fmt.Printf("Raw response: %s\n", respMsg.Content)
+		return nil, fmt.Errorf("failed to parse bot response json: %w", err)
+	}
+
+	botResp := &BotResponse{}
+
+	// 7. Execute Actions
+	for _, rawAction := range rawResp.Actions {
+		var contentStr string
+		if rawAction.Content != nil {
+			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
+				contentStr = string(rawAction.Content)
+			}
+		}
+
+		switch rawAction.Type {
+		case "memory_update":
+			if err := os.WriteFile(memoriesPath, []byte(contentStr), 0644); err != nil {
+				fmt.Printf("Failed to update memories: %v\n", err)
+			} else {
+				fmt.Println("Memories updated.")
+			}
+
+		case "response":
+			// Watcher Check
+			proceed, reason, err := b.CheckMessage(contentStr, context)
+			if err != nil {
+				fmt.Printf("Watcher check error: %v\n", err)
+				if b.SendMasterFunc != nil {
+					b.SendMasterFunc(fmt.Sprintf("[System] Watcher error: %v", err))
+				}
+				continue
+			}
+
+			if !proceed {
+				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", contentStr, reason)
+				if b.SendMasterFunc != nil {
+					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", contentStr, reason))
+				}
+				continue
+			}
+
+			// Send to contact (no [Blady] prefix for task conversations)
+			if sendToContact != nil {
+				sendToContact(contentStr)
+			}
+
+			// Transition task to running if pending
+			if task.Status == tasks.StatusPending {
+				if err := b.TaskManager.SetTaskRunning(task.ID); err != nil {
+					fmt.Printf("Failed to set task running: %v\n", err)
+				}
+			}
+
+		case "message_master":
+			if b.SendMasterFunc != nil {
+				b.SendMasterFunc(contentStr)
+			}
+
+		case "pause_task":
+			if err := b.TaskManager.PauseTask(task.ID); err != nil {
+				fmt.Printf("Failed to pause task %d: %v\n", task.ID, err)
+			}
+
+		default:
+			fmt.Printf("Unknown action type in task mode: %s\n", rawAction.Type)
 		}
 	}
 
