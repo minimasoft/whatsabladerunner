@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"whatsabladerunner/pkg/ollama"
 	"whatsabladerunner/pkg/prompt"
+	"whatsabladerunner/pkg/tasks"
 )
 
 type Bot struct {
 	Client        *ollama.Client
 	PromptManager *prompt.PromptManager
+	TaskManager   *tasks.TaskManager
 	ConfigDir     string
 
 	SendFunc       func(string)
@@ -24,6 +27,7 @@ func NewBot(client *ollama.Client, configDir string, sendFunc func(string), send
 	return &Bot{
 		Client:         client,
 		PromptManager:  prompt.NewPromptManager(configDir),
+		TaskManager:    tasks.NewTaskManager(filepath.Join(configDir, "tasks")),
 		ConfigDir:      configDir,
 		SendFunc:       sendFunc,
 		SendMasterFunc: sendMasterFunc,
@@ -31,11 +35,23 @@ func NewBot(client *ollama.Client, configDir string, sendFunc func(string), send
 	}
 }
 
+// RawAction is used for initial parsing to handle flexible content types
+type RawAction struct {
+	Type    string          `json:"type"`
+	Content json.RawMessage `json:"content"`
+}
+
+type RawBotResponse struct {
+	Actions []RawAction `json:"actions"`
+}
+
+// Action represents a processed action with string content
 type Action struct {
 	Type    string `json:"type"`
 	Content string `json:"content"`
 }
 
+// BotResponse is the processed response returned to callers
 type BotResponse struct {
 	Actions []Action `json:"actions"`
 }
@@ -102,10 +118,22 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		return nil, fmt.Errorf("failed to read memories: %w", err)
 	}
 
-	// 3. Load Mode Prompt
+	// 3. Load Tasks
+	activeTasks, err := b.TaskManager.LoadActiveTasks()
+	if err != nil {
+		fmt.Printf("Warning: failed to load tasks: %v\n", err)
+		activeTasks = []tasks.Task{}
+	}
+	tasksJSON, err := json.Marshal(activeTasks)
+	if err != nil {
+		fmt.Printf("Warning: failed to marshal tasks: %v\n", err)
+		tasksJSON = []byte("[]")
+	}
+
+	// 4. Load Mode Prompt
 	modeData := prompt.ModeData{
 		Memories: string(memoriesContent),
-		Tasks:    "[]", // Default empty tasks
+		Tasks:    string(tasksJSON),
 		Contacts: b.Contacts,
 		Context:  strings.Join(context, "\n"),
 		Message:  msg,
@@ -134,23 +162,38 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	content := respMsg.Content
 	content = cleanJSON(content)
 
-	var botResp BotResponse
-	if err := json.Unmarshal([]byte(content), &botResp); err != nil {
+	var rawResp RawBotResponse
+	if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
 		fmt.Printf("Raw response: %s\n", respMsg.Content)
 		return nil, fmt.Errorf("failed to parse bot response json: %w", err)
 	}
 
+	// Build the returned BotResponse with processed actions
+	botResp := &BotResponse{}
+
 	// 6. Execute Actions
-	for _, action := range botResp.Actions {
-		if action.Type == "memory_update" {
-			if err := os.WriteFile(memoriesPath, []byte(action.Content), 0644); err != nil {
+	for _, rawAction := range rawResp.Actions {
+		// Parse content as string for most actions
+		var contentStr string
+		if rawAction.Content != nil {
+			// Try to unmarshal as string first
+			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
+				// Not a string, keep raw for special handling
+				contentStr = string(rawAction.Content)
+			}
+		}
+
+		switch rawAction.Type {
+		case "memory_update":
+			if err := os.WriteFile(memoriesPath, []byte(contentStr), 0644); err != nil {
 				fmt.Printf("Failed to update memories: %v\n", err)
 			} else {
 				fmt.Println("Memories updated.")
 			}
-		} else if action.Type == "response" {
+
+		case "response":
 			// Watcher Check
-			proceed, reason, err := b.CheckMessage(action.Content, context)
+			proceed, reason, err := b.CheckMessage(contentStr, context)
 			if err != nil {
 				fmt.Printf("Watcher check error: %v\n", err)
 				if b.SendMasterFunc != nil {
@@ -160,25 +203,90 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 			}
 
 			if !proceed {
-				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", action.Content, reason)
+				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", contentStr, reason)
 				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", action.Content, reason))
+					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", contentStr, reason))
 				}
 				continue
 			}
 
 			if b.SendFunc != nil {
-				finalMsg := "[Blady] : " + action.Content
+				finalMsg := "[Blady] : " + contentStr
 				b.SendFunc(finalMsg)
 			}
-		} else if action.Type == "message_master" {
+
+		case "message_master":
 			if b.SendMasterFunc != nil {
-				b.SendMasterFunc(action.Content)
+				b.SendMasterFunc(contentStr)
 			}
+
+		case "create_task":
+			var taskContent tasks.CreateTaskContent
+			if err := json.Unmarshal(rawAction.Content, &taskContent); err != nil {
+				fmt.Printf("Failed to parse create_task content: %v\n", err)
+				continue
+			}
+			task, err := b.TaskManager.CreateTask(taskContent.Objective, taskContent.Contact, taskContent.OriginalOrders)
+			if err != nil {
+				fmt.Printf("Failed to create task: %v\n", err)
+			} else {
+				fmt.Printf("Task %d created successfully\n", task.ID)
+			}
+
+		case "delete_task":
+			id, err := parseTaskID(contentStr)
+			if err != nil {
+				fmt.Printf("Failed to parse delete_task ID: %v\n", err)
+				continue
+			}
+			if err := b.TaskManager.DeleteTask(id); err != nil {
+				fmt.Printf("Failed to delete task %d: %v\n", id, err)
+			}
+
+		case "confirm_task":
+			id, err := parseTaskID(contentStr)
+			if err != nil {
+				fmt.Printf("Failed to parse confirm_task ID: %v\n", err)
+				continue
+			}
+			if err := b.TaskManager.ConfirmTask(id); err != nil {
+				fmt.Printf("Failed to confirm task %d: %v\n", id, err)
+			}
+
+		case "pause_task":
+			id, err := parseTaskID(contentStr)
+			if err != nil {
+				fmt.Printf("Failed to parse pause_task ID: %v\n", err)
+				continue
+			}
+			if err := b.TaskManager.PauseTask(id); err != nil {
+				fmt.Printf("Failed to pause task %d: %v\n", id, err)
+			}
+
+		case "resume_task":
+			id, err := parseTaskID(contentStr)
+			if err != nil {
+				fmt.Printf("Failed to parse resume_task ID: %v\n", err)
+				continue
+			}
+			if err := b.TaskManager.ResumeTask(id); err != nil {
+				fmt.Printf("Failed to resume task %d: %v\n", id, err)
+			}
+
+		default:
+			fmt.Printf("Unknown action type: %s\n", rawAction.Type)
 		}
 	}
 
-	return &botResp, nil
+	return botResp, nil
+}
+
+// parseTaskID parses a task ID from a string that might be quoted or a number
+func parseTaskID(s string) (int, error) {
+	// Remove quotes if present
+	s = strings.Trim(s, `"`)
+	s = strings.TrimSpace(s)
+	return strconv.Atoi(s)
 }
 
 func cleanJSON(content string) string {
