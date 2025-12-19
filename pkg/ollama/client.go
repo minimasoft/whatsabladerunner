@@ -56,21 +56,36 @@ func (c *Client) Chat(messages []Message) (*Message, error) {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := c.Client.Post(c.BaseURL+"/api/chat", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
+	var resp *http.Response
+	var lastErr error
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ollama API error: %s - %s", resp.Status, string(body))
+	for attempt := 1; attempt <= 3; attempt++ {
+		fmt.Printf("[Ollama] Attempt %d/3: Sending request to model %s with %d messages...\n", attempt, c.Model, len(messages))
+
+		resp, lastErr = c.Client.Post(c.BaseURL+"/api/chat", "application/json", bytes.NewBuffer(jsonData))
+
+		if lastErr == nil && resp.StatusCode == http.StatusOK {
+			// Success
+			defer resp.Body.Close()
+
+			var chatResp ChatResponse
+			if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+				return nil, fmt.Errorf("failed to decode response: %w", err)
+			}
+
+			fmt.Printf("[Ollama] Success! Response received (length: %d chars).\n", len(chatResp.Message.Content))
+			return &chatResp.Message, nil
+		}
+
+		if resp != nil {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			lastErr = fmt.Errorf("HTTP %s: %s", resp.Status, string(body))
+		}
+
+		fmt.Printf("[Ollama] Attempt %d failed: %v. Retrying in 2s...\n", attempt, lastErr)
+		time.Sleep(2 * time.Second)
 	}
 
-	var chatResp ChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &chatResp.Message, nil
+	return nil, fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
 }

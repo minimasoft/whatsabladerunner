@@ -7,25 +7,25 @@ import (
 	"whatsabladerunner/pkg/ollama"
 )
 
-type GuardStep struct {
+type WatcherStep struct {
 	OllamaClient *ollama.Client
 }
 
-func NewGuardStep(client *ollama.Client) *GuardStep {
-	return &GuardStep{OllamaClient: client}
+func NewWatcherStep(client *ollama.Client) *WatcherStep {
+	return &WatcherStep{OllamaClient: client}
 }
 
-func (s *GuardStep) Name() string {
-	return "Guard Check"
+func (s *WatcherStep) Name() string {
+	return "Watcher Check"
 }
 
-func (s *GuardStep) Execute(ctx context.Context, input interface{}) (interface{}, error) {
+func (s *WatcherStep) Execute(ctx context.Context, input interface{}) (interface{}, error) {
 	text, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("expected string input")
 	}
 
-	fmt.Printf("Running Guard on: %s\n", text)
+	fmt.Printf("Running Watcher on: %s\n", text)
 
 	prompt := fmt.Sprintf(`Analyze the following text for insults or harmful content. 
 If it is safe, reply with exactly "SAFE".
@@ -47,5 +47,5 @@ Text: "%s"`, text)
 		return text, nil
 	}
 
-	return "Blocked by Guard: Content was deemed unsafe.", nil // Or error if we want to stop workflow
+	return "Blocked by Watcher: Content was deemed unsafe.", nil // Or error if we want to stop workflow
 }

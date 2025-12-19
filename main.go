@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"whatsabladerunner/pkg/agent"
-	"whatsabladerunner/pkg/ollama"
-	"whatsabladerunner/workflows"
+
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/mdp/qrterminal/v3"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
@@ -19,10 +19,6 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/mdp/qrterminal/v3"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"whatsabladerunner/pkg/agent"
 	"whatsabladerunner/pkg/ollama"
@@ -48,15 +44,25 @@ func eventHandler(evt interface{}) {
 		if v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User {
 			fmt.Println("it's you - triggering workflow")
 
-			if v.Message != nil && v.Message.ExtendedTextMessage != nil {
-				text := v.Message.ExtendedTextMessage.Text
-				if text != nil {
+			fmt.Printf("DEBUG: Message Struct: %+v\n", v.Message)
+			if v.Message != nil {
+				text := ""
+				if v.Message.ExtendedTextMessage != nil {
+					text = *v.Message.ExtendedTextMessage.Text
+				} else if v.Message.Conversation != nil {
+					text = *v.Message.Conversation
+				}
+
+				if text != "" {
+					fmt.Printf("DEBUG: Extracted text: %s\n", text)
 					// Start workflow in background, managed by ConversationManager
 					chatID := v.Info.Chat.String()
 					convManager.StartWorkflow(chatID, func(ctx context.Context) {
 						wf := workflows.NewDemoWorkflow(ollamaClient)
-						wf.Run(ctx, *text)
+						wf.Run(ctx, text)
 					})
+				} else {
+					fmt.Println("DEBUG: No text found in message")
 				}
 			}
 		} else {
@@ -94,7 +100,7 @@ func main() {
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 
 	// Initialize custom services
-	ollamaClient = ollama.NewClient("http://localhost:11434", "llama3") // Defaulting to llama3, user can change
+	ollamaClient = ollama.NewClient("http://localhost:11434", "qwen3:8b")
 	convManager = agent.NewConversationManager()
 
 	client.AddEventHandler(eventHandler)

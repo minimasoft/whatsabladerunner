@@ -32,11 +32,10 @@ func (s *SendMessageStep) Execute(ctx context.Context, input interface{}) (inter
 }
 
 func (d *DemoWorkflow) Run(ctx context.Context, input string) {
-	grammarStep := workflow.NewGrammarStep(d.OllamaClient)
-	guardStep := workflow.NewGuardStep(d.OllamaClient)
+	watcherStep := workflow.NewWatcherStep(d.OllamaClient)
 	sendStep := &SendMessageStep{}
 
-	wf := workflow.NewWorkflow("Demo Workflow", grammarStep, guardStep, sendStep)
+	wf := workflow.NewWorkflow("Demo Workflow", watcherStep, sendStep)
 
 	_, err := wf.Execute(ctx, input)
 	if err != nil {

@@ -38,7 +38,7 @@ func (cm *ConversationManager) StartWorkflow(conversationID string, work func(ct
 		defer func() {
 			cm.mu.Lock()
 			// Only remove if it's still the active context (hasn't been replaced)
-			if currentCancel, exists := cm.activeContexts[conversationID]; exists {
+			if _, exists := cm.activeContexts[conversationID]; exists {
 				// We can't easily compare functions, but we can assume if the work finished naturally,
 				// we should clean up if we are still the "active" one.
 				// However, if a new one started, it would have overwritten the map entry.
