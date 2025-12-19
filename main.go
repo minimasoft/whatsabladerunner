@@ -51,10 +51,14 @@ func eventHandler(evt interface{}) {
 	case *events.Message:
 		fmt.Println("------------------------------------------------")
 		fmt.Printf("Received a message!\n")
-		//fmt.Printf("ID: %s\n", v.Info.ID)
-		fmt.Printf("Time: %s\n", v.Info.Timestamp)
-		fmt.Printf("Sender: %s (PushName: %s)\n", v.Info.Sender, v.Info.PushName)
-		fmt.Printf("Chat: %s\n", v.Info.Chat)
+		fmt.Printf("  ID: %s\n", v.Info.ID)
+		fmt.Printf("  Time: %s\n", v.Info.Timestamp)
+		fmt.Printf("  Sender: %s\n", v.Info.Sender)
+		fmt.Printf("  PushName: %s\n", v.Info.PushName)
+		fmt.Printf("  Chat: %s\n", v.Info.Chat)
+		fmt.Printf("  IsFromMe: %v\n", v.Info.IsFromMe)
+		fmt.Printf("  IsGroup: %v\n", v.Info.IsGroup)
+		fmt.Printf("  MessageSource: %+v\n", v.Info.MessageSource)
 
 		// Save message to history
 		// We want to save ALL text messages to history to have a full log.
@@ -162,20 +166,30 @@ func eventHandler(evt interface{}) {
 				fmt.Println("DEBUG: No text found in message")
 			}
 		} else {
-			// Not a self-message - check if there's an active task for this contact
-			// Ignore messages from me in other chats to avoid echo
+			// Not a self-message - always ignore messages from me in other chats to avoid echo
 			if v.Info.IsFromMe {
 				fmt.Println("Ignoring my own message in non-self conversation")
 				return
 			}
 
+			// Check if there's an active task for this chat
+			chatJID := v.Info.Chat.String()
+
 			if msgText != "" && taskBot != nil {
-				senderJID := v.Info.Chat.String() // Use Chat JID to match task contact
-				task, err := taskBot.TaskManager.GetTaskByContact(senderJID)
+				// Check by both chat ID and contact for task matching
+				task, err := taskBot.TaskManager.GetTaskByContact(chatJID)
 				if err != nil {
 					fmt.Printf("Error checking for task: %v\n", err)
 				} else if task != nil {
-					fmt.Printf("Active task %d found for contact %s - routing to task mode\n", task.ID, senderJID)
+					// Found active task - route incoming message from contact to task mode
+					fmt.Printf("Active task %d found for chat %s - routing to task mode\n", task.ID, chatJID)
+
+					// Update ChatID if it changed (e.g., bot responded from different JID)
+					if task.ChatID != chatJID {
+						if err := taskBot.TaskManager.SetTaskChatID(task.ID, chatJID); err != nil {
+							fmt.Printf("Failed to update task chat ID: %v\n", err)
+						}
+					}
 
 					// Route to task mode
 					chatID := v.Info.Chat.String()
@@ -315,7 +329,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	clientLog := waLog.Stdout("Client", "DEBUG", true)
+	clientLog := waLog.Stdout("Client", "INFO", true)
 	whatsAppClient = whatsmeow.NewClient(deviceStore, clientLog)
 	client := whatsAppClient
 
@@ -365,6 +379,11 @@ func main() {
 		if err != nil {
 			fmt.Printf("Failed to parse contact JID %s: %v\n", task.Contact, err)
 			return
+		}
+
+		// Set ChatID to the contact JID initially (may be updated if bot responds from different JID)
+		if err := taskBot.TaskManager.SetTaskChatID(task.ID, task.Contact); err != nil {
+			fmt.Printf("Failed to set task chat ID: %v\n", err)
 		}
 
 		// Get conversation context for the task contact

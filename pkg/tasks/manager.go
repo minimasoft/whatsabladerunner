@@ -24,6 +24,7 @@ type Task struct {
 	Objective      string `json:"objective"`
 	OriginalOrders string `json:"original_orders"`
 	Contact        string `json:"contact"`
+	ChatID         string `json:"chat_id,omitempty"` // Chat JID where task is active (may differ from Contact for bots)
 	Status         string `json:"status"`
 }
 
@@ -275,8 +276,8 @@ func (tm *TaskManager) ResumeTask(id int) error {
 	return nil
 }
 
-// GetTaskByContact finds an active (running or pending) task for the given contact
-func (tm *TaskManager) GetTaskByContact(contact string) (*Task, error) {
+// GetTaskByContact finds an active (running or pending) task for the given contact or chat ID
+func (tm *TaskManager) GetTaskByContact(contactOrChatID string) (*Task, error) {
 	entries, err := os.ReadDir(tm.TasksDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -305,8 +306,8 @@ func (tm *TaskManager) GetTaskByContact(contact string) (*Task, error) {
 			continue
 		}
 
-		// Check if this task is for the contact and is active (running or pending)
-		if task.Contact == contact && (task.Status == StatusRunning || task.Status == StatusPending) {
+		// Check if this task matches by Contact or ChatID and is active (running or pending)
+		if (task.Contact == contactOrChatID || task.ChatID == contactOrChatID) && (task.Status == StatusRunning || task.Status == StatusPending) {
 			return &task, nil
 		}
 	}
@@ -356,4 +357,21 @@ func (tm *TaskManager) ConfirmTaskAndGet(id int) (*Task, error) {
 
 	fmt.Printf("[TaskManager] Confirmed task %d: status changed to %s\n", id, task.Status)
 	return task, nil
+}
+
+// SetTaskChatID sets the chat ID for a task (for bots that respond from different JID)
+func (tm *TaskManager) SetTaskChatID(id int, chatID string) error {
+	task, err := tm.LoadTask(id)
+	if err != nil {
+		return err
+	}
+
+	oldChatID := task.ChatID
+	task.ChatID = chatID
+	if err := tm.SaveTask(task); err != nil {
+		return err
+	}
+
+	fmt.Printf("[TaskManager] Task %d chat ID updated: '%s' -> '%s'\n", id, oldChatID, chatID)
+	return nil
 }

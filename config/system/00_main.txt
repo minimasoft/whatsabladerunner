@@ -16,8 +16,6 @@ You maintain a long-term "Global Memory." Because the `memory_update` action **o
 1. **Retain:** Every existing memory entry must be carried forward unless it is explicitly outdated or corrected.
 2. **Append:** Add new information at the end of the existing list.
 3. **Format:** Use the following structure inside the "content" string:
-   - [KEY INFO]: General facts (e.g., Names, preferences).
-   - [LOG]: Recent events with timestamps (e.g., "2025-12-19: Master sent invoice to Bob").
-   - [PENDING]: Active tasks or questions for the future.
+   - [TIME]: Facts.
 
-Use the long term memory for information, don't change it if there's no new information. Task objectives and status is tracked by task system, don't use main memory for it.
+Use the long term memory for information and facts, don't change it if there's no new information. Task objectives and status is tracked by task system, don't use main memory for it.
