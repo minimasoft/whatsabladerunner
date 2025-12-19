@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sort"
 	"syscall"
 	"time"
+	"whatsabladerunner/pkg/agent"
+	"whatsabladerunner/pkg/ollama"
+	"whatsabladerunner/workflows"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
@@ -21,6 +23,15 @@ import (
 	"github.com/mdp/qrterminal/v3"
 
 	_ "github.com/mattn/go-sqlite3"
+
+	"whatsabladerunner/pkg/agent"
+	"whatsabladerunner/pkg/ollama"
+	"whatsabladerunner/workflows"
+)
+
+var (
+	ollamaClient *ollama.Client
+	convManager  *agent.ConversationManager
 )
 
 func eventHandler(evt interface{}) {
@@ -32,45 +43,33 @@ func eventHandler(evt interface{}) {
 		fmt.Printf("Time: %s\n", v.Info.Timestamp)
 		fmt.Printf("Sender: %s (PushName: %s)\n", v.Info.Sender, v.Info.PushName)
 		fmt.Printf("Chat: %s\n", v.Info.Chat)
-		// Check if the message is sent to the current client/account (Note to Self)
-		if v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User {
-			fmt.Println("it's you")
-		}
 
-		if v.Message != nil && v.Message.ExtendedTextMessage != nil {
-			fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
+		// Check if the message is sent to self (Note to Self)
+		if v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User {
+			fmt.Println("it's you - triggering workflow")
+
+			if v.Message != nil && v.Message.ExtendedTextMessage != nil {
+				text := v.Message.ExtendedTextMessage.Text
+				if text != nil {
+					// Start workflow in background, managed by ConversationManager
+					chatID := v.Info.Chat.String()
+					convManager.StartWorkflow(chatID, func(ctx context.Context) {
+						wf := workflows.NewDemoWorkflow(ollamaClient)
+						wf.Run(ctx, *text)
+					})
+				}
+			}
+		} else {
+			if v.Message != nil && v.Message.ExtendedTextMessage != nil {
+				fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
+			}
 		}
 		fmt.Println("------------------------------------------------")
 	case *events.HistorySync:
+		// ... existing history sync code ...
 		id := v.Data.GetSyncType()
 		if id == waHistorySync.HistorySync_FULL || id == waHistorySync.HistorySync_RECENT {
 			fmt.Printf("Received History Sync (Type: %s)\n", id)
-
-			conversations := v.Data.GetConversations()
-			// Sort by LastMsgTimestamp descending
-			sort.Slice(conversations, func(i, j int) bool {
-				return conversations[i].GetLastMsgTimestamp() > conversations[j].GetLastMsgTimestamp()
-			})
-
-			for _, conv := range conversations {
-				fmt.Printf("Conversation: %s (%s)\n", conv.GetID(), conv.GetName())
-				if conv.GetUnreadCount() > 0 {
-					fmt.Printf("  Unread: %d\n", conv.GetUnreadCount())
-				}
-				if conv.GetIsParentGroup() || conv.GetIsDefaultSubgroup() {
-					fmt.Println("  [Group/Community]")
-				}
-
-				// List participants if available (HistorySync might not always have full participant list for all convs, but let's check)
-				// Note: Conversation proto in HistorySync has 'participant' field
-				participants := conv.GetParticipant()
-				if len(participants) > 0 {
-					fmt.Println("  Participants:")
-					for _, p := range participants {
-						fmt.Printf("    - %s\n", p.GetUserJID())
-					}
-				}
-			}
 		}
 	}
 }
@@ -93,6 +92,11 @@ func main() {
 	}
 	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
+
+	// Initialize custom services
+	ollamaClient = ollama.NewClient("http://localhost:11434", "llama3") // Defaulting to llama3, user can change
+	convManager = agent.NewConversationManager()
+
 	client.AddEventHandler(eventHandler)
 
 	// Configure Identification
