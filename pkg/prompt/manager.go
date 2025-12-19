@@ -36,7 +36,7 @@ func (pm *PromptManager) LoadSystemPrompt(lang string) (string, error) {
 	dir := filepath.Join(pm.ConfigDir, "system")
 	data := SystemData{
 		Language: lang,
-		Date:     time.Now().Format("2006-01-02 15:04:05"),
+		Date:     time.Now().Format("Monday, 2006-01-02 15:04:05"),
 	}
 	return pm.renderTemplates(dir, data)
 }

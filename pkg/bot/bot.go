@@ -14,13 +14,15 @@ type Bot struct {
 	Client        *ollama.Client
 	PromptManager *prompt.PromptManager
 	ConfigDir     string
+	SendFunc      func(string)
 }
 
-func NewBot(client *ollama.Client, configDir string) *Bot {
+func NewBot(client *ollama.Client, configDir string, sendFunc func(string)) *Bot {
 	return &Bot{
 		Client:        client,
 		PromptManager: prompt.NewPromptManager(configDir),
 		ConfigDir:     configDir,
+		SendFunc:      sendFunc,
 	}
 }
 
@@ -108,6 +110,11 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 			} else {
 				fmt.Println("Memories updated.")
 			}
+		} else if action.Type == "response" {
+			if b.SendFunc != nil {
+				finalMsg := "[Blady] : " + action.Response
+				b.SendFunc(finalMsg)
+			}
 		}
 	}
 
@@ -116,6 +123,16 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 
 func cleanJSON(content string) string {
 	content = strings.TrimSpace(content)
+	// Find the start of the JSON object
+	start := strings.Index(content, "{")
+	// Find the end of the JSON object
+	end := strings.LastIndex(content, "}")
+
+	if start != -1 && end != -1 && end > start {
+		return content[start : end+1]
+	}
+
+	// Fallback to previous logic if braces not found (unlikely for valid JSON)
 	if strings.HasPrefix(content, "```json") {
 		content = strings.TrimPrefix(content, "```json")
 		content = strings.TrimSuffix(content, "```")
