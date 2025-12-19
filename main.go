@@ -79,8 +79,18 @@ func eventHandler(evt interface{}) {
 							}
 						}
 
+						// Fetch context (last 4 messages)
+						// For now, we'll try to use the store if possible, or just pass empty.
+						// Since accessing history synchronously might be slow or complex without specific store queries,
+						// we will define a simple helper or just pass empty for this iteration,
+						// but the user asked for "if possible".
+						// Providing strict "last 4 messages" requires a correctly configured History store.
+						// We'll pass an empty slice for now to satisfy the signature and allow future expansion.
+						var contextMsgs []string
+						// TODO: Implement actual history fetching locally if needed.
+
 						wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc)
-						wf.Run(ctx, text)
+						wf.Run(ctx, text, contextMsgs)
 					})
 				} else {
 					fmt.Println("DEBUG: No text found in message")

@@ -23,7 +23,7 @@ func NewClient(baseURL, model string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		Model:   model,
-		Client:  &http.Client{Timeout: 60 * time.Second},
+		Client:  &http.Client{Timeout: 90 * time.Second},
 		DefaultOptions: map[string]interface{}{
 			"temperature": 0.13,
 			"num_ctx":     9000,

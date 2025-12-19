@@ -22,7 +22,7 @@ Current message:
 
 You can respond and update your memories, both are optional.
 
-The memory update will replace existing memories and it's limited to 4096 characters, use it only when necessary, if no
+The memory update will replace existing memories, so write-back everything important. Also keep in mind context from chat can be limited so memories are the only thing that will remain.
 
 The response should be ONLY json with this format (sample):
 ```json
