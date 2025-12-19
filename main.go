@@ -25,14 +25,19 @@ import (
 
 	"whatsabladerunner/pkg/agent"
 	"whatsabladerunner/pkg/bot"
+	"whatsabladerunner/pkg/cerebras"
 	"whatsabladerunner/pkg/history"
+	"whatsabladerunner/pkg/llm"
 	"whatsabladerunner/pkg/ollama"
 	"whatsabladerunner/pkg/tasks"
 	"whatsabladerunner/workflows"
 )
 
+// LLMProvider selects which LLM provider to use: "ollama" or "cerebras"
+const LLMProvider = "cerebras" //"ollama"
+
 var (
-	ollamaClient   *ollama.Client
+	llmClient      llm.Client
 	convManager    *agent.ConversationManager
 	whatsAppClient *whatsmeow.Client
 	historyStore   *history.HistoryStore
@@ -150,7 +155,7 @@ func eventHandler(evt interface{}) {
 						}
 					}
 
-					wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback)
+					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback)
 					wf.Run(ctx, msgText, contextMsgs)
 				})
 			} else {
@@ -158,6 +163,12 @@ func eventHandler(evt interface{}) {
 			}
 		} else {
 			// Not a self-message - check if there's an active task for this contact
+			// Ignore messages from me in other chats to avoid echo
+			if v.Info.IsFromMe {
+				fmt.Println("Ignoring my own message in non-self conversation")
+				return
+			}
+
 			if msgText != "" && taskBot != nil {
 				senderJID := v.Info.Chat.String() // Use Chat JID to match task contact
 				task, err := taskBot.TaskManager.GetTaskByContact(senderJID)
@@ -308,8 +319,21 @@ func main() {
 	whatsAppClient = whatsmeow.NewClient(deviceStore, clientLog)
 	client := whatsAppClient
 
-	// Initialize custom services
-	ollamaClient = ollama.NewClient("http://localhost:11434", "qwen3:8b")
+	// Initialize LLM client based on provider selection
+	switch LLMProvider {
+	case "cerebras":
+		fmt.Println("Using Cerebras LLM provider")
+		var err error
+		llmClient, err = cerebras.NewClient("config/keys/cerebras.txt", "gpt-oss-120b")
+		if err != nil {
+			panic(fmt.Sprintf("Failed to initialize Cerebras client: %v", err))
+		}
+	case "ollama":
+		fallthrough
+	default:
+		fmt.Println("Using Ollama LLM provider")
+		llmClient = ollama.NewClient("http://localhost:11434", "qwen3:8b")
+	}
 	convManager = agent.NewConversationManager()
 
 	historyStore, err = history.New("history.db")
@@ -319,7 +343,20 @@ func main() {
 
 	// Initialize task bot with StartTaskCallback
 	// This callback is triggered when a task is confirmed via confirm_task action
-	taskBot = bot.NewBot(ollamaClient, "config", nil, nil, getAllContactsJSON(client))
+	// SendMasterFunc sends to self-chat (Note to Self) - uses closure over whatsAppClient
+	sendMasterFromTask := func(msg string) {
+		if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+			// Get own JID for self-chat
+			ownJID := whatsAppClient.Store.ID.ToNonAD()
+			_, err := whatsAppClient.SendMessage(context.Background(), ownJID, &waProto.Message{
+				Conversation: proto.String("[Task] : " + msg),
+			})
+			if err != nil {
+				fmt.Printf("Failed to send master message from task: %v\n", err)
+			}
+		}
+	}
+	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client))
 	taskBot.StartTaskCallback = func(task *tasks.Task) {
 		fmt.Printf("[TaskManager] Starting task %d for contact %s\n", task.ID, task.Contact)
 

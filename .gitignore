@@ -20,4 +20,6 @@ go.work.sum
 main
 config/memories.txt
 config/memories.txt
+config/keys/
 blady
+whatsabladerunner

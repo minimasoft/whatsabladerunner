@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"whatsabladerunner/pkg/ollama"
+	"whatsabladerunner/pkg/llm"
 	"whatsabladerunner/pkg/prompt"
 	"whatsabladerunner/pkg/tasks"
 )
 
 type Bot struct {
-	Client        *ollama.Client
+	Client        llm.Client
 	PromptManager *prompt.PromptManager
 	TaskManager   *tasks.TaskManager
 	ConfigDir     string
@@ -24,7 +24,7 @@ type Bot struct {
 	StartTaskCallback func(*tasks.Task) // Called when a task is confirmed to start it
 }
 
-func NewBot(client *ollama.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
+func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
 	return &Bot{
 		Client:         client,
 		PromptManager:  prompt.NewPromptManager(configDir),
@@ -78,7 +78,7 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 		return false, "", fmt.Errorf("failed to load system prompt: %w", err)
 	}
 
-	msgs := []ollama.Message{
+	msgs := []llm.Message{
 		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: watcherPrompt},
 	}
@@ -144,7 +144,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		return nil, fmt.Errorf("failed to load mode prompt: %w", err)
 	}
 
-	msgs := []ollama.Message{
+	msgs := []llm.Message{
 		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: modePrompt},
 	}
@@ -193,24 +193,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 			}
 
 		case "response":
-			// Watcher Check
-			proceed, reason, err := b.CheckMessage(contentStr, context)
-			if err != nil {
-				fmt.Printf("Watcher check error: %v\n", err)
-				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("[System] Watcher error: %v", err))
-				}
-				continue
-			}
-
-			if !proceed {
-				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", contentStr, reason)
-				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", contentStr, reason))
-				}
-				continue
-			}
-
+			// In command mode, no watcher check - just send directly
 			if b.SendFunc != nil {
 				finalMsg := "[Blady] : " + contentStr
 				b.SendFunc(finalMsg)
@@ -225,13 +208,34 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 			var taskContent tasks.CreateTaskContent
 			if err := json.Unmarshal(rawAction.Content, &taskContent); err != nil {
 				fmt.Printf("Failed to parse create_task content: %v\n", err)
+				if b.SendFunc != nil {
+					b.SendFunc("[Blady] : Error: No pude procesar la creación de tarea.")
+				}
 				continue
 			}
+
+			// Validate contact is in the contacts list
+			if !b.isValidContact(taskContent.Contact) {
+				fmt.Printf("Failed to create task: contact %s not in contacts list\n", taskContent.Contact)
+				if b.SendFunc != nil {
+					b.SendFunc(fmt.Sprintf("[Blady] : Error: El contacto '%s' no está en la lista de contactos. No se puede crear la tarea.", taskContent.Contact))
+				}
+				continue
+			}
+
 			task, err := b.TaskManager.CreateTask(taskContent.Objective, taskContent.Contact, taskContent.OriginalOrders)
 			if err != nil {
 				fmt.Printf("Failed to create task: %v\n", err)
+				if b.SendFunc != nil {
+					b.SendFunc(fmt.Sprintf("[Blady] : Error al crear tarea: %v", err))
+				}
 			} else {
 				fmt.Printf("Task %d created successfully\n", task.ID)
+				// Print task JSON to self-chat
+				if b.SendFunc != nil {
+					taskJSON, _ := json.MarshalIndent(task, "", "  ")
+					b.SendFunc(fmt.Sprintf("[Blady] : Tarea creada:\n```json\n%s\n```", string(taskJSON)))
+				}
 			}
 
 		case "delete_task":
@@ -335,7 +339,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		return nil, fmt.Errorf("failed to load task mode prompt: %w", err)
 	}
 
-	msgs := []ollama.Message{
+	msgs := []llm.Message{
 		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: modePrompt},
 	}
@@ -455,4 +459,13 @@ func cleanJSON(content string) string {
 		content = strings.TrimSuffix(content, "```")
 	}
 	return strings.TrimSpace(content)
+}
+
+// isValidContact checks if a contact number exists in the bot's contacts list
+func (b *Bot) isValidContact(contact string) bool {
+	if b.Contacts == "" || b.Contacts == "[]" {
+		return false
+	}
+	// Simple string check - the contact should appear as a "number" field value
+	return strings.Contains(b.Contacts, fmt.Sprintf(`"number":"%s"`, contact))
 }

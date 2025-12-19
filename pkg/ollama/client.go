@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"whatsabladerunner/pkg/llm"
 )
 
 type Client struct {
@@ -23,7 +25,7 @@ func NewClient(baseURL, model string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		Model:   model,
-		Client:  &http.Client{Timeout: 125 * time.Second},
+		Client:  &http.Client{Timeout: 222 * time.Second},
 		DefaultOptions: map[string]interface{}{
 			"temperature": 0.13,
 			"num_ctx":     9000,
@@ -32,26 +34,21 @@ func NewClient(baseURL, model string) *Client {
 	}
 }
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 type ChatRequest struct {
 	Model    string                 `json:"model"`
-	Messages []Message              `json:"messages"`
+	Messages []llm.Message          `json:"messages"`
 	Stream   bool                   `json:"stream"`
 	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
 type ChatResponse struct {
-	Model   string  `json:"model"`
-	Created string  `json:"created_at"`
-	Message Message `json:"message"`
-	Done    bool    `json:"done"`
+	Model   string      `json:"model"`
+	Created string      `json:"created_at"`
+	Message llm.Message `json:"message"`
+	Done    bool        `json:"done"`
 }
 
-func (c *Client) Chat(messages []Message, options map[string]interface{}) (*Message, error) {
+func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*llm.Message, error) {
 	finalOptions := make(map[string]interface{})
 	for k, v := range c.DefaultOptions {
 		finalOptions[k] = v
