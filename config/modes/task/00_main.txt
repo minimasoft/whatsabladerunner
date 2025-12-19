@@ -13,4 +13,13 @@ Remember to mark the task as finished when you are done.
 
 Talk with respect and be thankful.
 
-Some bots will ask for specific answer formats. Do your best to follow them. If a response is multiple choice write the exact text of the choice (or number if asked for number).
+Some bots will ask for specific answer formats. Do your best to follow them. If a response is multiple choice write the exact text of the choice.
+
+For example:
+1. ✅ Finalizar
+2. No
+3. Ir al menú
+
+You want 3? Write "Ir al menú". You want 1? Write "✅ Finalizar". You want 2? Write "No".
+
+If the message is with button ids use a button response.

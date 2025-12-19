@@ -18,10 +18,11 @@ type Bot struct {
 	TaskManager   *tasks.TaskManager
 	ConfigDir     string
 
-	SendFunc          func(string)
-	SendMasterFunc    func(string)
-	Contacts          string            // JSON formatted string of contacts
-	StartTaskCallback func(*tasks.Task) // Called when a task is confirmed to start it
+	SendFunc               func(string)
+	SendMasterFunc         func(string)
+	SendButtonResponseFunc func(displayText, buttonID string) // For sending button responses
+	Contacts               string                             // JSON formatted string of contacts
+	StartTaskCallback      func(*tasks.Task)                  // Called when a task is confirmed to start it
 }
 
 func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
@@ -421,6 +422,26 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		case "pause_task":
 			if err := b.TaskManager.PauseTask(task.ID); err != nil {
 				fmt.Printf("Failed to pause task %d: %v\n", task.ID, err)
+			}
+
+		case "button_response":
+			// Parse button response content: {displayText, buttonID}
+			var btnResp struct {
+				DisplayText string `json:"displayText"`
+				ButtonID    string `json:"buttonID"`
+			}
+			if err := json.Unmarshal(rawAction.Content, &btnResp); err != nil {
+				fmt.Printf("Failed to parse button_response content: %v\n", err)
+				continue
+			}
+			if b.SendButtonResponseFunc != nil {
+				b.SendButtonResponseFunc(btnResp.DisplayText, btnResp.ButtonID)
+			}
+			// Transition task to running if pending
+			if task.Status == tasks.StatusPending {
+				if err := b.TaskManager.SetTaskRunning(task.ID); err != nil {
+					fmt.Printf("Failed to set task running: %v\n", err)
+				}
 			}
 
 		default:

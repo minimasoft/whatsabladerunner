@@ -6,6 +6,7 @@ Your response must be a single JSON object.
 - `memory_update`: The **full, updated version** of the Global Memory. Global memory IS NOT FOR TASKS. Tasks have their own memory.
 - `response`: A message sent to the 3rd party (as the Master).
 - `message_master`: A private note or summary for the Master.
+- `button_response`: Click a button option. Content is `{"displayText": "Option text", "buttonID": "{\"block\":\"123\",\"i\":0}"}`. Use the exact buttonID JSON from the options.
 - `create_task`: A new task to be added to the task list.
 This is a special type that has a dict content instead of string, it contains objective and contact to create, if unsure about the contact confirm with the user.
 Additional field `original_orders` should copy all the order details as written by the user originally. The contact field is strictly the number@whatsap and not any text. 

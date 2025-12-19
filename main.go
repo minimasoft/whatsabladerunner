@@ -73,18 +73,24 @@ func eventHandler(evt interface{}) {
 			} else if v.Message.Conversation != nil {
 				msgText = *v.Message.Conversation
 			} else if v.Message.ButtonsMessage != nil {
-				// Handle buttons message - extract content text and button options
+				// Handle buttons message - extract content text and button options with JSON IDs
 				bm := v.Message.ButtonsMessage
 				if bm.ContentText != nil {
 					msgText = *bm.ContentText
 				}
-				// Append button options as formatted text
+				// Append button options with both display text and button ID JSON
 				if len(bm.Buttons) > 0 {
-					msgText += "\n\n[Opciones de respuesta]:"
-					for i, btn := range bm.Buttons {
+					msgText += "\n\n[Opciones de respuesta - responder con el buttonID JSON]:"
+					for _, btn := range bm.Buttons {
+						displayText := ""
+						buttonID := ""
 						if btn.ButtonText != nil && btn.ButtonText.DisplayText != nil {
-							msgText += fmt.Sprintf("\n%d. %s", i+1, *btn.ButtonText.DisplayText)
+							displayText = *btn.ButtonText.DisplayText
 						}
+						if btn.ButtonID != nil {
+							buttonID = *btn.ButtonID
+						}
+						msgText += fmt.Sprintf("\n- \"%s\" -> buttonID: %s", displayText, buttonID)
 					}
 				}
 			}
@@ -235,12 +241,39 @@ func eventHandler(evt interface{}) {
 							}
 						}
 
+						// Button response function for task conversation
+						sendButtonResponse := func(displayText, buttonID string) {
+							if whatsAppClient != nil {
+								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s\n", displayText, buttonID)
+								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
+										SelectedButtonID: proto.String(buttonID),
+										Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
+											SelectedDisplayText: displayText,
+										},
+										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
+									},
+								})
+								if err != nil {
+									fmt.Printf("Failed to send button response: %v\n", err)
+								} else {
+									err := historyStore.SaveMessage(resp.ID, chatID, "Me", displayText, time.Now(), true)
+									if err != nil {
+										fmt.Printf("Failed to save button response to history: %v\n", err)
+									}
+								}
+							}
+						}
+
 						// Reload task to get current status
 						currentTask, err := taskBot.TaskManager.LoadTask(task.ID)
 						if err != nil {
 							fmt.Printf("Failed to reload task: %v\n", err)
 							return
 						}
+
+						// Set the button response function before processing
+						taskBot.SendButtonResponseFunc = sendButtonResponse
 
 						_, err = taskBot.ProcessTask(currentTask, msgText, contextMsgs, sendToContact)
 						if err != nil {
@@ -427,8 +460,33 @@ func main() {
 			}
 		}
 
+		// Create button response function for this contact
+		sendButtonResponse := func(displayText, buttonID string) {
+			if whatsAppClient != nil {
+				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s\n", displayText, buttonID)
+				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
+						SelectedButtonID: proto.String(buttonID),
+						Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
+							SelectedDisplayText: displayText,
+						},
+						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
+					},
+				})
+				if err != nil {
+					fmt.Printf("Failed to send button response: %v\n", err)
+				} else {
+					err := historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
+					if err != nil {
+						fmt.Printf("Failed to save button response to history: %v\n", err)
+					}
+				}
+			}
+		}
+
 		// Process task with empty message (initial prompt)
 		go func() {
+			taskBot.SendButtonResponseFunc = sendButtonResponse
 			_, err := taskBot.ProcessTask(task, "", contextMsgs, sendToContact)
 			if err != nil {
 				fmt.Printf("Task initial processing failed: %v\n", err)
