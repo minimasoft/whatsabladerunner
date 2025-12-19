@@ -61,7 +61,7 @@ func eventHandler(evt interface{}) {
 		}
 
 		if msgText != "" {
-			err := historyStore.SaveMessage(v.Info.Chat.String(), v.Info.Sender.String(), msgText, v.Info.Timestamp, v.Info.IsFromMe)
+			err := historyStore.SaveMessage(v.Info.ID, v.Info.Chat.String(), v.Info.Sender.String(), msgText, v.Info.Timestamp, v.Info.IsFromMe)
 			if err != nil {
 				fmt.Printf("Failed to save message to history: %v\n", err)
 			}
@@ -85,7 +85,7 @@ func eventHandler(evt interface{}) {
 				convManager.StartWorkflow(chatID, func(ctx context.Context) {
 					sendFunc := func(msg string) {
 						if whatsAppClient != nil {
-							_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+							resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
 								Conversation: proto.String(msg),
 							})
 							if err != nil {
@@ -98,7 +98,8 @@ func eventHandler(evt interface{}) {
 								// So 'isFromMe' = true.
 								// We should probably construct it safely.
 								// Note: The timestamp will be 'now'.
-								err := historyStore.SaveMessage(v.Info.Chat.String(), v.Info.Sender.String(), msg, time.Now(), true)
+								// Use resp.ID for uniqueness.
+								err := historyStore.SaveMessage(resp.ID, v.Info.Chat.String(), v.Info.Sender.String(), msg, time.Now(), true)
 								if err != nil {
 									fmt.Printf("Failed to save bot response to history: %v\n", err)
 								}
@@ -218,7 +219,8 @@ func eventHandler(evt interface{}) {
 					}
 
 					if text != "" {
-						err := historyStore.SaveMessage(chatJID, senderJID, text, ts, isFromMe)
+						msgID := msg.GetMessage().GetKey().GetID()
+						err := historyStore.SaveMessage(msgID, chatJID, senderJID, text, ts, isFromMe)
 						if err != nil {
 							fmt.Printf("Failed to save history sync message: %v\n", err)
 						}
