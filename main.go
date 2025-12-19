@@ -46,9 +46,10 @@ var (
 
 // ButtonsContext stores the context needed for button responses
 type ButtonsContext struct {
-	MessageID   string
-	Participant string
-	Message     *waProto.Message
+	MessageID      string
+	Participant    string
+	DestinationJID types.JID // The JID to send button responses to (SenderAlt format)
+	Message        *waProto.Message
 }
 
 // lastButtonsMessage stores the last buttons/list message per chat for context
@@ -104,12 +105,20 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store buttons context for later response
-				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
-					MessageID:   v.Info.ID,
-					Participant: v.Info.Sender.String(),
-					Message:     v.Message,
+				// Use SenderAlt if available (s.whatsapp.net format) for participant and destination
+				participant := v.Info.Sender.String()
+				destinationJID := v.Info.Chat // Default to chat JID
+				if !v.Info.MessageSource.SenderAlt.IsEmpty() {
+					participant = v.Info.MessageSource.SenderAlt.String()
+					destinationJID = v.Info.MessageSource.SenderAlt // Use SenderAlt as destination!
 				}
-				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s\n", v.Info.ID, v.Info.Chat.String())
+				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+					MessageID:      v.Info.ID,
+					Participant:    participant,
+					DestinationJID: destinationJID,
+					Message:        v.Message,
+				}
+				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s participant=%s destination=%s\n", v.Info.ID, v.Info.Chat.String(), participant, destinationJID.String())
 			} else if v.Message.ListMessage != nil {
 				// Handle list message (dropdown options)
 				lm := v.Message.ListMessage
@@ -134,12 +143,20 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store list context for later response
-				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
-					MessageID:   v.Info.ID,
-					Participant: v.Info.Sender.String(),
-					Message:     v.Message,
+				// Use SenderAlt if available (s.whatsapp.net format) for participant and destination
+				listParticipant := v.Info.Sender.String()
+				listDestinationJID := v.Info.Chat
+				if !v.Info.MessageSource.SenderAlt.IsEmpty() {
+					listParticipant = v.Info.MessageSource.SenderAlt.String()
+					listDestinationJID = v.Info.MessageSource.SenderAlt
 				}
-				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s\n", v.Info.ID, v.Info.Chat.String())
+				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+					MessageID:      v.Info.ID,
+					Participant:    listParticipant,
+					DestinationJID: listDestinationJID,
+					Message:        v.Message,
+				}
+				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s participant=%s destination=%s\n", v.Info.ID, v.Info.Chat.String(), listParticipant, listDestinationJID.String())
 			}
 		}
 
@@ -304,10 +321,11 @@ func eventHandler(evt interface{}) {
 									return
 								}
 
-								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s\n",
-									displayText, buttonID, btnCtx.MessageID, btnCtx.Participant)
+								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s, destination=%s\n",
+									displayText, buttonID, btnCtx.MessageID, btnCtx.Participant, btnCtx.DestinationJID.String())
 
-								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								// Send to DestinationJID (SenderAlt format), NOT v.Info.Chat!
+								resp, err := whatsAppClient.SendMessage(context.Background(), btnCtx.DestinationJID, &waProto.Message{
 									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 										SelectedButtonID: proto.String(buttonID),
 										Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
@@ -543,10 +561,11 @@ func main() {
 					return
 				}
 
-				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s\n",
-					displayText, buttonID, btnCtx.MessageID, btnCtx.Participant)
+				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s, destination=%s\n",
+					displayText, buttonID, btnCtx.MessageID, btnCtx.Participant, btnCtx.DestinationJID.String())
 
-				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+				// Send to DestinationJID (SenderAlt format), NOT contactJID!
+				resp, err := whatsAppClient.SendMessage(context.Background(), btnCtx.DestinationJID, &waProto.Message{
 					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 						SelectedButtonID: proto.String(buttonID),
 						Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
