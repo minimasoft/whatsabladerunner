@@ -1,0 +1,19 @@
+## Long-term memory
+```
+{{.Memories}}
+```
+
+## Tasks
+```
+{{.Tasks}}
+```
+
+## Conversation context
+```
+{{.Context}}
+```
+
+## Current message
+```
+{{.Message}}
+```

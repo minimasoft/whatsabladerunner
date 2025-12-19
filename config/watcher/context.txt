@@ -1,0 +1,19 @@
+## Long-term memory
+```
+{{.Memories}}
+```
+
+## Task
+```
+{{.Task}}
+```
+
+## Conversation context
+```
+{{.Context}}
+```
+
+## Proposed message
+```
+{{.ProposedMessage}}
+```

@@ -1,0 +1,12 @@
+## ACTIONS & JSON STRUCTURE 
+Your response must be a single JSON object. 
+
+**Available Action Types:**
+- `proceed`: Everything looks fine. Content should be empty.
+- `block`: Message should be blocked. Content should justify the block.
+
+**Example Format:**
+{
+  "action": "proceed",
+  "reason": "",
+}

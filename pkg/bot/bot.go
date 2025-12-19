@@ -38,6 +38,54 @@ type BotResponse struct {
 	Actions []Action `json:"actions"`
 }
 
+type WatcherResponse struct {
+	Action string `json:"action"`
+	Reason string `json:"reason"`
+}
+
+func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, error) {
+	watcherData := prompt.WatcherData{
+		ProposedMessage: proposedMsg,
+		Context:         strings.Join(context, "\n"),
+	}
+
+	watcherPrompt, err := b.PromptManager.LoadWatcherPrompt(watcherData)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to load watcher prompt: %w", err)
+	}
+
+	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
+	if err != nil {
+		return false, "", fmt.Errorf("failed to load system prompt: %w", err)
+	}
+
+	msgs := []ollama.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: watcherPrompt},
+	}
+
+	fmt.Printf("DEBUG: Sending to Watcher:\n--- System Prompt ---\n%s\n--- Watcher Prompt ---\n%s\n---------------------\n", sysPrompt, watcherPrompt)
+
+	respMsg, err := b.Client.Chat(msgs, nil)
+	if err != nil {
+		return false, "", fmt.Errorf("watcher ollama chat failed: %w", err)
+	}
+
+	fmt.Printf("DEBUG: Watcher Response:\n%s\n---------------------\n", respMsg.Content)
+
+	content := cleanJSON(respMsg.Content)
+	var watcherResp WatcherResponse
+	if err := json.Unmarshal([]byte(content), &watcherResp); err != nil {
+		return false, "", fmt.Errorf("failed to parse watcher response json: %w", err)
+	}
+
+	if watcherResp.Action == "block" {
+		return false, watcherResp.Reason, nil
+	}
+
+	return true, "", nil
+}
+
 func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, error) {
 	// 1. Load System Prompt
 	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
@@ -65,18 +113,6 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	}
 
 	// 4. Combine prompts and send to Ollama
-	// Using system prompt as User message or System message?
-	// Ollama usually supports system role. But here we can just concat or use roles.
-	// The user prompt files seem to imply they are instructions.
-	// Let's us System role for System Prompt if possible, but the `client.go` interactions are simple list.
-	// We will send:
-	// System: sysPrompt
-	// User: modePrompt (which contains the current message and context embedded)
-
-	// Wait, the mode prompt `command/00_main.txt` says: "Now you are in command mode... Current message: {{.Message}}... The response should be ONLY json..."
-	// So `modePrompt` contains the instruction AND the message input.
-	// So we can send it as User message.
-
 	msgs := []ollama.Message{
 		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: modePrompt},
@@ -91,8 +127,6 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	}
 
 	// 5. Parse Response
-	// The response is expected to be JSON.
-	// Sometimes LLMs wrap JSON in ```json ... ``` blocks. We should handle that.
 	fmt.Printf("DEBUG: Raw Ollama Response:\n%s\n---------------------\n", respMsg.Content)
 
 	content := respMsg.Content
@@ -113,6 +147,24 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 				fmt.Println("Memories updated.")
 			}
 		} else if action.Type == "response" {
+			// Watcher Check
+			proceed, reason, err := b.CheckMessage(action.Content, context)
+			if err != nil {
+				fmt.Printf("Watcher check error: %v\n", err)
+				if b.SendMasterFunc != nil {
+					b.SendMasterFunc(fmt.Sprintf("[System] Watcher error: %v", err))
+				}
+				continue
+			}
+
+			if !proceed {
+				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", action.Content, reason)
+				if b.SendMasterFunc != nil {
+					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", action.Content, reason))
+				}
+				continue
+			}
+
 			if b.SendFunc != nil {
 				finalMsg := "[Blady] : " + action.Content
 				b.SendFunc(finalMsg)

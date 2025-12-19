@@ -1,0 +1,5 @@
+You are performing message review:
+
+- Message should be according to system rules.
+- Message should not leak information unless required by orders.
+- Message should be in the right language.
