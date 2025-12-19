@@ -10,9 +10,10 @@ import (
 )
 
 type Client struct {
-	BaseURL string
-	Model   string
-	Client  *http.Client
+	BaseURL        string
+	Model          string
+	Client         *http.Client
+	DefaultOptions map[string]interface{}
 }
 
 func NewClient(baseURL, model string) *Client {
@@ -23,6 +24,11 @@ func NewClient(baseURL, model string) *Client {
 		BaseURL: baseURL,
 		Model:   model,
 		Client:  &http.Client{Timeout: 60 * time.Second},
+		DefaultOptions: map[string]interface{}{
+			"temperature": 0.13,
+			"num_ctx":     9000,
+			"think":       false,
+		},
 	}
 }
 
@@ -32,9 +38,10 @@ type Message struct {
 }
 
 type ChatRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Stream   bool      `json:"stream"`
+	Model    string                 `json:"model"`
+	Messages []Message              `json:"messages"`
+	Stream   bool                   `json:"stream"`
+	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
 type ChatResponse struct {
@@ -44,11 +51,20 @@ type ChatResponse struct {
 	Done    bool    `json:"done"`
 }
 
-func (c *Client) Chat(messages []Message) (*Message, error) {
+func (c *Client) Chat(messages []Message, options map[string]interface{}) (*Message, error) {
+	finalOptions := make(map[string]interface{})
+	for k, v := range c.DefaultOptions {
+		finalOptions[k] = v
+	}
+	for k, v := range options {
+		finalOptions[k] = v
+	}
+
 	reqBody := ChatRequest{
 		Model:    c.Model,
 		Messages: messages,
 		Stream:   false,
+		Options:  finalOptions,
 	}
 
 	jsonData, err := json.Marshal(reqBody)

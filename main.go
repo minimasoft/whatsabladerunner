@@ -13,6 +13,7 @@ import (
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -26,9 +27,12 @@ import (
 )
 
 var (
-	ollamaClient *ollama.Client
-	convManager  *agent.ConversationManager
+	ollamaClient   *ollama.Client
+	convManager    *agent.ConversationManager
+	whatsAppClient *whatsmeow.Client
 )
+
+const BotPrefix = "[Blady] : "
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -54,11 +58,28 @@ func eventHandler(evt interface{}) {
 				}
 
 				if text != "" {
+					// Ignore messages starting with BotPrefix
+					if len(text) >= len(BotPrefix) && text[:len(BotPrefix)] == BotPrefix {
+						fmt.Println("Ignoring bot message")
+						return
+					}
+
 					fmt.Printf("DEBUG: Extracted text: %s\n", text)
 					// Start workflow in background, managed by ConversationManager
 					chatID := v.Info.Chat.String()
 					convManager.StartWorkflow(chatID, func(ctx context.Context) {
-						wf := workflows.NewDemoWorkflow(ollamaClient)
+						sendFunc := func(msg string) {
+							if whatsAppClient != nil {
+								_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									Conversation: proto.String(msg),
+								})
+								if err != nil {
+									fmt.Printf("Failed to send message: %v\n", err)
+								}
+							}
+						}
+
+						wf := workflows.NewCommandWorkflow(ollamaClient, sendFunc)
 						wf.Run(ctx, text)
 					})
 				} else {
@@ -97,7 +118,8 @@ func main() {
 		panic(err)
 	}
 	clientLog := waLog.Stdout("Client", "DEBUG", true)
-	client := whatsmeow.NewClient(deviceStore, clientLog)
+	whatsAppClient = whatsmeow.NewClient(deviceStore, clientLog)
+	client := whatsAppClient
 
 	// Initialize custom services
 	ollamaClient = ollama.NewClient("http://localhost:11434", "qwen3:8b")

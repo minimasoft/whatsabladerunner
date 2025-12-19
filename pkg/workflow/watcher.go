@@ -37,7 +37,7 @@ Text: "%s"`, text)
 		{Role: "user", Content: prompt},
 	}
 
-	resp, err := s.OllamaClient.Chat(msgs)
+	resp, err := s.OllamaClient.Chat(msgs, nil)
 	if err != nil {
 		return nil, err
 	}
