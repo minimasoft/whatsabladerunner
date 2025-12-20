@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/mdp/qrterminal/v3"
 
 	"go.mau.fi/whatsmeow"
+	waAdv "go.mau.fi/whatsmeow/proto/waAdv"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
@@ -364,50 +366,80 @@ func eventHandler(evt interface{}) {
 									return
 								}
 
-								// Use Strategy 1 (LID/LID) as default for the task-bot context (or reuse the multi-strat logic if desired, but let's stick to the main one or replicate)
-								// Since this is inside the "Note to Self" workflow, it might be separate from the main one.
-								// Actually, this 'lastButtonsMessage' lookup is shared global state.
-								// Let's implement the same multi-strategy here for consistency in debugging.
-
-								// Final Strategy: Perfect Mirror (based on decoded protobuf evidence)
-								// 1. Participant must be the Phone Number (not Me, not LID).
-								// 2. Destination must match the Participant (Phone Number).
-								// 3. QuotedMessage must be Deep Clean (no nested ContextInfo).
+								// Final Strategy: Full Mirror (V4)
+								// 1. Participant PN.
+								// 2. Full Identity/Context Mirror.
+								// 3. Tab Padding (exactly matching success logs).
 
 								cleanQuote := getCleanQuotedMessage(btnCtx.Message)
+								cleanQuote.MessageContextInfo = &waProto.MessageContextInfo{}
 
-								// Prepare JIDs
-								// Target JID should be the Phone Number (SenderAlt)
-								targetPN := btnCtx.SenderAlt
-								if targetPN.IsEmpty() {
-									targetPN = btnCtx.ChatJID
+								// Extract identity info to mirror back
+								var hash []byte
+								var ts uint64 = uint64(time.Now().Unix())
+								if btnCtx.Message.MessageContextInfo != nil && btnCtx.Message.MessageContextInfo.DeviceListMetadata != nil {
+									hash = btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientKeyHash
+									if btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp != nil {
+										ts = *btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp
+									}
 								}
 
-								// Participant should be the Phone Number as string (without suffix)
+								// Participant PN
 								partPN := btnCtx.SenderAlt.ToNonAD().String()
 								if btnCtx.SenderAlt.IsEmpty() {
 									partPN = btnCtx.SenderJID.ToNonAD().String()
 								}
 
-								fmt.Printf("[ButtonResponse] Sending Mirror Response: Dest=%s, Part=%s, StanzaID=%s\n",
-									targetPN, partPN, btnCtx.MessageID)
+								target := btnCtx.ChatJID
 
-								resp, err := whatsAppClient.SendMessage(context.Background(), targetPN, &waProto.Message{
+								protoMsg := &waProto.Message{
+									// Padding at end: success logs show 10 tabs
+									Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"),
+									MessageContextInfo: &waProto.MessageContextInfo{
+										DeviceListMetadataVersion: proto.Int32(2),
+										DeviceListMetadata: &waProto.DeviceListMetadata{
+											SenderKeyHash:   hash,
+											SenderTimestamp: proto.Uint64(ts),
+											// Explicitly set AccountTypes to E2EE (0) as seen in logs
+											SenderAccountType:   waAdv.ADVEncryptionType_E2EE.Enum(),
+											ReceiverAccountType: waAdv.ADVEncryptionType_E2EE.Enum(),
+										},
+									},
 									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 										SelectedButtonID: proto.String(buttonID),
 										Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
 											SelectedDisplayText: displayText,
 										},
-										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 										ContextInfo: &waProto.ContextInfo{
 											StanzaID:      proto.String(btnCtx.MessageID),
 											Participant:   proto.String(partPN),
 											QuotedMessage: cleanQuote,
 										},
+										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 									},
-								})
+								}
+
+								marshaled, _ := proto.Marshal(protoMsg)
+								fmt.Printf("[ButtonResponse] Proto Base64 Mirror V4: %s\n", base64.StdEncoding.EncodeToString(marshaled))
+
+								fmt.Printf("[ButtonResponse] Sending Mirror Response (V4): Dest=%s, Part=%s, StanzaID=%s\n",
+									target, partPN, btnCtx.MessageID)
+
+								resp, err := whatsAppClient.SendMessage(context.Background(), target, protoMsg)
 								if err != nil {
-									fmt.Printf("[ButtonResponse] Failed: %v\n", err)
+									fmt.Printf("[ButtonResponse] Failed with Dest=%s: %v\n", target, err)
+									// Fallback retry with PN
+									if target.String() != btnCtx.SenderAlt.String() && !btnCtx.SenderAlt.IsEmpty() {
+										targetPN := btnCtx.SenderAlt
+										fmt.Printf("[ButtonResponse] Retry with Dest=PN: %s\n", targetPN)
+										resp, err = whatsAppClient.SendMessage(context.Background(), targetPN, protoMsg)
+										if err == nil {
+											fmt.Printf("[ButtonResponse] Success with Dest=PN! ID: %s\n", resp.ID)
+											historyStore.SaveMessage(resp.ID, chatID, "Me", displayText, time.Now(), true)
+										} else {
+											fmt.Printf("[ButtonResponse] Failed with Dest=PN: %v\n", err)
+										}
+									}
 								} else {
 									fmt.Printf("[ButtonResponse] Success! ID: %s\n", resp.ID)
 									historyStore.SaveMessage(resp.ID, chatID, "Me", displayText, time.Now(), true)
@@ -629,13 +661,17 @@ func main() {
 				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s\n",
 					displayText, buttonID, btnCtx.MessageID)
 
-				// Implement Multi-Strategy Debugging for 479 Error in Task Callback as wellError
-				// Final Strategy: Perfect Mirror
+				// Final Strategy: Full Mirror (V4)
 				cleanQuote := getCleanQuotedMessage(btnCtx.Message)
+				cleanQuote.MessageContextInfo = &waProto.MessageContextInfo{}
 
-				targetPN := btnCtx.SenderAlt
-				if targetPN.IsEmpty() {
-					targetPN = btnCtx.ChatJID
+				var hash []byte
+				var ts uint64 = uint64(time.Now().Unix())
+				if btnCtx.Message.MessageContextInfo != nil && btnCtx.Message.MessageContextInfo.DeviceListMetadata != nil {
+					hash = btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientKeyHash
+					if btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp != nil {
+						ts = *btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp
+					}
 				}
 
 				partPN := btnCtx.SenderAlt.ToNonAD().String()
@@ -643,25 +679,53 @@ func main() {
 					partPN = btnCtx.SenderJID.ToNonAD().String()
 				}
 
-				fmt.Printf("[ButtonResponse] Sending Mirror Response (Task): Dest=%s, Part=%s, StanzaID=%s\n",
-					targetPN, partPN, btnCtx.MessageID)
+				target := btnCtx.ChatJID
 
-				resp, err := whatsAppClient.SendMessage(context.Background(), targetPN, &waProto.Message{
+				protoMsg := &waProto.Message{
+					Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"),
+					MessageContextInfo: &waProto.MessageContextInfo{
+						DeviceListMetadataVersion: proto.Int32(2),
+						DeviceListMetadata: &waProto.DeviceListMetadata{
+							SenderKeyHash:       hash,
+							SenderTimestamp:     proto.Uint64(ts),
+							SenderAccountType:   waAdv.ADVEncryptionType_E2EE.Enum(),
+							ReceiverAccountType: waAdv.ADVEncryptionType_E2EE.Enum(),
+						},
+					},
 					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 						SelectedButtonID: proto.String(buttonID),
 						Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
 							SelectedDisplayText: displayText,
 						},
-						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 						ContextInfo: &waProto.ContextInfo{
 							StanzaID:      proto.String(btnCtx.MessageID),
 							Participant:   proto.String(partPN),
 							QuotedMessage: cleanQuote,
 						},
+						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 					},
-				})
+				}
+
+				marshaled, _ := proto.Marshal(protoMsg)
+				fmt.Printf("[ButtonResponse] Proto Base64 Mirror V4 (Task): %s\n", base64.StdEncoding.EncodeToString(marshaled))
+
+				fmt.Printf("[ButtonResponse] Sending Mirror Response (V4 Task): Dest=%s, Part=%s, StanzaID=%s\n",
+					target, partPN, btnCtx.MessageID)
+
+				resp, err := whatsAppClient.SendMessage(context.Background(), target, protoMsg)
 				if err != nil {
-					fmt.Printf("[ButtonResponse] Failed (Task): %v\n", err)
+					fmt.Printf("[ButtonResponse] Failed (Task) with Dest=%s: %v\n", target, err)
+					if target.String() != btnCtx.SenderAlt.String() && !btnCtx.SenderAlt.IsEmpty() {
+						targetPN := btnCtx.SenderAlt
+						fmt.Printf("[ButtonResponse] Retry (Task) with Dest=PN: %s\n", targetPN)
+						resp, err = whatsAppClient.SendMessage(context.Background(), targetPN, protoMsg)
+						if err == nil {
+							fmt.Printf("[ButtonResponse] Success (Task) with Dest=PN! ID: %s\n", resp.ID)
+							historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
+						} else {
+							fmt.Printf("[ButtonResponse] Failed (Task) with Dest=PN: %v\n", err)
+						}
+					}
 				} else {
 					fmt.Printf("[ButtonResponse] Success (Task)! ID: %s\n", resp.ID)
 					historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
