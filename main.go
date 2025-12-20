@@ -46,16 +46,68 @@ var (
 
 // ButtonsContext stores the context needed for button responses
 type ButtonsContext struct {
-	MessageID      string
-	Participant    string
-	DestinationJID types.JID // The JID to send button responses to (SenderAlt format)
-	Message        *waProto.Message
+	MessageID string
+	ChatJID   types.JID // The origin chat (LID or Group or PN)
+	SenderJID types.JID // The actual sender (LID or PN)
+	SenderAlt types.JID // The alternative JID (PN if Sender is LID)
+	Message   *waProto.Message
 }
 
 // lastButtonsMessage stores the last buttons/list message per chat for context
 var lastButtonsMessage = make(map[string]*ButtonsContext)
 
 const BotPrefix = "[Blady] : "
+
+// Helper to strip metadata from quoted messages
+func getCleanQuotedMessage(orig *waProto.Message) *waProto.Message {
+	if orig == nil {
+		return nil
+	}
+	clean := &waProto.Message{}
+	// Copy only content fields, ignore transport metadata or context info wrapper
+	if orig.Conversation != nil {
+		clean.Conversation = orig.Conversation
+	}
+	if orig.ExtendedTextMessage != nil {
+		clean.ExtendedTextMessage = &waProto.ExtendedTextMessage{
+			Text: orig.ExtendedTextMessage.Text,
+			// Ignore ContextInfo, PreviewType, etc.
+		}
+	}
+	if orig.ButtonsMessage != nil {
+		// Deep copy ButtonsMessage content, EXCLUDING ContextInfo
+		bm := orig.ButtonsMessage
+		clean.ButtonsMessage = &waProto.ButtonsMessage{
+			ContentText: bm.ContentText,
+			FooterText:  bm.FooterText,
+			Buttons:     bm.Buttons, // Buttons themselves are simple structs usually
+			HeaderType:  bm.HeaderType,
+			// explicit: ContextInfo: nil
+		}
+		if bm.HeaderType != nil && *bm.HeaderType != waProto.ButtonsMessage_EMPTY {
+			// Copy header content if present (Text, Doc, Image etc)
+			// But for safety, maybe just text?
+			// The log showed headerType:EMPTY usually.
+			// If we need media headers, we'd copy them.
+		}
+	}
+	if orig.ListMessage != nil {
+		lm := orig.ListMessage
+		clean.ListMessage = &waProto.ListMessage{
+			Title:       lm.Title,
+			Description: lm.Description,
+			ButtonText:  lm.ButtonText,
+			ListType:    lm.ListType,
+			Sections:    lm.Sections,
+			FooterText:  lm.FooterText,
+			// explicit: ContextInfo: nil
+		}
+	}
+	// ... (other types simplified for now, focusing on text/buttons/list)
+
+	// Ensure MessageContextInfo is nil or empty to avoid 479 on re-send
+	return clean
+}
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -105,20 +157,16 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store buttons context for later response
-				// Use SenderAlt if available (s.whatsapp.net format) for participant and destination
-				participant := v.Info.Sender.String()
-				destinationJID := v.Info.Chat // Default to chat JID
-				if !v.Info.MessageSource.SenderAlt.IsEmpty() {
-					participant = v.Info.MessageSource.SenderAlt.String()
-					destinationJID = v.Info.MessageSource.SenderAlt // Use SenderAlt as destination!
-				}
+				// Store RAW JIDs to allow strategy testing
 				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
-					MessageID:      v.Info.ID,
-					Participant:    participant,
-					DestinationJID: destinationJID,
-					Message:        v.Message,
+					MessageID: v.Info.ID,
+					ChatJID:   v.Info.Chat,
+					SenderJID: v.Info.Sender,
+					SenderAlt: v.Info.MessageSource.SenderAlt,
+					Message:   v.Message,
 				}
-				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s participant=%s destination=%s\n", v.Info.ID, v.Info.Chat.String(), participant, destinationJID.String())
+				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s sender=%s senderAlt=%s\n",
+					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
 			} else if v.Message.ListMessage != nil {
 				// Handle list message (dropdown options)
 				lm := v.Message.ListMessage
@@ -143,20 +191,15 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store list context for later response
-				// Use SenderAlt if available (s.whatsapp.net format) for participant and destination
-				listParticipant := v.Info.Sender.String()
-				listDestinationJID := v.Info.Chat
-				if !v.Info.MessageSource.SenderAlt.IsEmpty() {
-					listParticipant = v.Info.MessageSource.SenderAlt.String()
-					listDestinationJID = v.Info.MessageSource.SenderAlt
-				}
 				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
-					MessageID:      v.Info.ID,
-					Participant:    listParticipant,
-					DestinationJID: listDestinationJID,
-					Message:        v.Message,
+					MessageID: v.Info.ID,
+					ChatJID:   v.Info.Chat,
+					SenderJID: v.Info.Sender,
+					SenderAlt: v.Info.MessageSource.SenderAlt,
+					Message:   v.Message,
 				}
-				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s participant=%s destination=%s\n", v.Info.ID, v.Info.Chat.String(), listParticipant, listDestinationJID.String())
+				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s sender=%s senderAlt=%s\n",
+					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
 			}
 		}
 
@@ -321,11 +364,35 @@ func eventHandler(evt interface{}) {
 									return
 								}
 
-								fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s, destination=%s\n",
-									displayText, buttonID, btnCtx.MessageID, btnCtx.Participant, btnCtx.DestinationJID.String())
+								// Use Strategy 1 (LID/LID) as default for the task-bot context (or reuse the multi-strat logic if desired, but let's stick to the main one or replicate)
+								// Since this is inside the "Note to Self" workflow, it might be separate from the main one.
+								// Actually, this 'lastButtonsMessage' lookup is shared global state.
+								// Let's implement the same multi-strategy here for consistency in debugging.
 
-								// Send to DestinationJID (SenderAlt format), NOT v.Info.Chat!
-								resp, err := whatsAppClient.SendMessage(context.Background(), btnCtx.DestinationJID, &waProto.Message{
+								// Final Strategy: Perfect Mirror (based on decoded protobuf evidence)
+								// 1. Participant must be the Phone Number (not Me, not LID).
+								// 2. Destination must match the Participant (Phone Number).
+								// 3. QuotedMessage must be Deep Clean (no nested ContextInfo).
+
+								cleanQuote := getCleanQuotedMessage(btnCtx.Message)
+
+								// Prepare JIDs
+								// Target JID should be the Phone Number (SenderAlt)
+								targetPN := btnCtx.SenderAlt
+								if targetPN.IsEmpty() {
+									targetPN = btnCtx.ChatJID
+								}
+
+								// Participant should be the Phone Number as string (without suffix)
+								partPN := btnCtx.SenderAlt.ToNonAD().String()
+								if btnCtx.SenderAlt.IsEmpty() {
+									partPN = btnCtx.SenderJID.ToNonAD().String()
+								}
+
+								fmt.Printf("[ButtonResponse] Sending Mirror Response: Dest=%s, Part=%s, StanzaID=%s\n",
+									targetPN, partPN, btnCtx.MessageID)
+
+								resp, err := whatsAppClient.SendMessage(context.Background(), targetPN, &waProto.Message{
 									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 										SelectedButtonID: proto.String(buttonID),
 										Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
@@ -334,18 +401,16 @@ func eventHandler(evt interface{}) {
 										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 										ContextInfo: &waProto.ContextInfo{
 											StanzaID:      proto.String(btnCtx.MessageID),
-											Participant:   proto.String(btnCtx.Participant),
-											QuotedMessage: btnCtx.Message,
+											Participant:   proto.String(partPN),
+											QuotedMessage: cleanQuote,
 										},
 									},
 								})
 								if err != nil {
-									fmt.Printf("Failed to send button response: %v\n", err)
+									fmt.Printf("[ButtonResponse] Failed: %v\n", err)
 								} else {
-									err := historyStore.SaveMessage(resp.ID, chatID, "Me", displayText, time.Now(), true)
-									if err != nil {
-										fmt.Printf("Failed to save button response to history: %v\n", err)
-									}
+									fmt.Printf("[ButtonResponse] Success! ID: %s\n", resp.ID)
+									historyStore.SaveMessage(resp.ID, chatID, "Me", displayText, time.Now(), true)
 								}
 							}
 						}
@@ -561,11 +626,27 @@ func main() {
 					return
 				}
 
-				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s, participant=%s, destination=%s\n",
-					displayText, buttonID, btnCtx.MessageID, btnCtx.Participant, btnCtx.DestinationJID.String())
+				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s\n",
+					displayText, buttonID, btnCtx.MessageID)
 
-				// Send to DestinationJID (SenderAlt format), NOT contactJID!
-				resp, err := whatsAppClient.SendMessage(context.Background(), btnCtx.DestinationJID, &waProto.Message{
+				// Implement Multi-Strategy Debugging for 479 Error in Task Callback as wellError
+				// Final Strategy: Perfect Mirror
+				cleanQuote := getCleanQuotedMessage(btnCtx.Message)
+
+				targetPN := btnCtx.SenderAlt
+				if targetPN.IsEmpty() {
+					targetPN = btnCtx.ChatJID
+				}
+
+				partPN := btnCtx.SenderAlt.ToNonAD().String()
+				if btnCtx.SenderAlt.IsEmpty() {
+					partPN = btnCtx.SenderJID.ToNonAD().String()
+				}
+
+				fmt.Printf("[ButtonResponse] Sending Mirror Response (Task): Dest=%s, Part=%s, StanzaID=%s\n",
+					targetPN, partPN, btnCtx.MessageID)
+
+				resp, err := whatsAppClient.SendMessage(context.Background(), targetPN, &waProto.Message{
 					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
 						SelectedButtonID: proto.String(buttonID),
 						Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
@@ -574,18 +655,16 @@ func main() {
 						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
 						ContextInfo: &waProto.ContextInfo{
 							StanzaID:      proto.String(btnCtx.MessageID),
-							Participant:   proto.String(btnCtx.Participant),
-							QuotedMessage: btnCtx.Message,
+							Participant:   proto.String(partPN),
+							QuotedMessage: cleanQuote,
 						},
 					},
 				})
 				if err != nil {
-					fmt.Printf("Failed to send button response: %v\n", err)
+					fmt.Printf("[ButtonResponse] Failed (Task): %v\n", err)
 				} else {
-					err := historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
-					if err != nil {
-						fmt.Printf("Failed to save button response to history: %v\n", err)
-					}
+					fmt.Printf("[ButtonResponse] Success (Task)! ID: %s\n", resp.ID)
+					historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
 				}
 			}
 		}
