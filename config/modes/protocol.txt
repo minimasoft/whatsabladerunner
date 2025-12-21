@@ -9,7 +9,7 @@ Your response must be a single JSON object.
 - `button_response`: Click a button option. Content is `{"displayText": "Option text", "buttonID": "{\"block\":\"123\",\"i\":0}"}`. Use the exact buttonID JSON from the options.
 - `create_task`: A new task to be added to the task list.
 This is a special type that has a dict content instead of string, it contains objective and contact to create, if unsure about the contact confirm with the user.
-Additional field `original_orders` should copy all the order details as written by the user originally. The contact field is strictly the number@whatsap and not any text. 
+Every field is strictly required. Additional field `original_orders` should copy all the order details as written by the user originally. The contact field is strictly the number@whatsap and not any text. `schedule_datetime` is optional, if provided use ISO 8601 format without timezone, seconds or milliseconds (e.g., `2024-12-31T23:59`).
 Only create the task when all information is available.
 - `delete_task`: A task to be deleted from the task list. Content is ID. ONLY BY USER REQUEST.
 - `confirm_task`: The user confirmed a newly created task so we can start working on it. Content is ID.
