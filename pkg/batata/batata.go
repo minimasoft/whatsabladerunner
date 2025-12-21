@@ -125,8 +125,8 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 	switch k.State {
 	case StateSetupLanguage:
 		choice, err := strconv.Atoi(cleanMsg)
-		if err != nil || choice < 1 || choice > 9 {
-			sendFunc(menu("❌ Invalid / Inválido\n" + LangSelectMenu()))
+		if err != nil || choice < 1 || choice > len(SupportedLanguages) {
+			sendFunc(menu(k.s(func(s Strings) string { return s.InvalidLanguageChoice }) + "\n" + LangSelectMenu()))
 			return true
 		}
 		k.Config.Language = Language(choice)
@@ -223,13 +223,13 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 		switch cleanMsg {
 		case "1":
 			k.Config.BrainProvider = "ollama"
-			sendFunc(msg("🧠 Brain set to Ollama!"))
+			sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetOllama })))
 		case "2":
 			k.Config.BrainProvider = "cerebras"
-			sendFunc(msg("🧠 Brain set to Cerebras!"))
+			sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetCerebras })))
 		case "3":
 			k.Config.BrainProvider = "none"
-			sendFunc(msg("🧠 Brain set to None (Offline)."))
+			sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetNone })))
 		}
 		k.Save()
 		k.State = StateMainMenu
