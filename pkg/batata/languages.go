@@ -64,6 +64,7 @@ type Strings struct {
 	BrainSetOllama        string
 	BrainSetCerebras      string
 	BrainSetNone          string
+	BladyRunning          string
 }
 
 var LangStrings = map[Language]Strings{
@@ -91,6 +92,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 ¡Cerebro configurado a Ollama!",
 		BrainSetCerebras:      "🧠 ¡Cerebro configurado a Cerebras!",
 		BrainSetNone:          "🧠 Cerebro configurado a Ninguno (Offline).",
+		BladyRunning:          "🤖 Blady ya está funcionando con el proveedor %s y el modelo: %s.",
 	},
 	LangEnglish: {
 		Intro:                 "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
@@ -116,6 +118,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Brain set to Ollama!",
 		BrainSetCerebras:      "🧠 Brain set to Cerebras!",
 		BrainSetNone:          "🧠 Brain set to None (Offline).",
+		BladyRunning:          "🤖 Blady is now running with provider %s and model: %s.",
 	},
 	LangHindi: {
 		Intro:                 "🥔 नमस्ते! मैं Batata हूँ, वह सरल कोर जो Blady के लिए बुनियादी ढांचे को संभालता है। आइए सब कुछ सेट करें!",
@@ -141,6 +144,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 दिमाग Ollama पर सेट किया गया!",
 		BrainSetCerebras:      "🧠 दिमाग Cerebras पर सेट किया गया!",
 		BrainSetNone:          "🧠 दिमाग किसी पर नहीं (ऑफ़लाइन) सेट किया गया।",
+		BladyRunning:          "🤖 Blady अब %s प्रदाता और %s मॉडल के साथ चल रहा है।",
 	},
 	LangPortuguese: {
 		Intro:                 "🥔 Olá! Sou o Batata, o núcleo simples que cuida da infraestrutura básica do Blady. Vamos configurar tudo!",
@@ -166,6 +170,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Cérebro definido para Ollama!",
 		BrainSetCerebras:      "🧠 Cérebro definido para Cerebras!",
 		BrainSetNone:          "🧠 Cérebro definido como Nenhum (Offline).",
+		BladyRunning:          "🤖 Blady agora está rodando com o provedor %s e modelo: %s.",
 	},
 	LangBengali: {
 		Intro:                 "🥔 এটি Batata, একটি কম-প্রচেষ্টার সরল কোর যা whatsabladerunner-এর প্রধান Blady কোরের জন্য মৌলিক অবকাঠামো পরিচালনা করে। মৌলিক কনফিগারেশন অনুসরণ করবে।",
@@ -191,6 +196,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 মস্তিষ্ক Ollama-তে সেট করা হয়েছে!",
 		BrainSetCerebras:      "🧠 মস্তিষ্ক Cerebras-এ সেট করা হয়েছে!",
 		BrainSetNone:          "🧠 মস্তিষ্ক কোনোটিই নয় (অফলাইন) সেট করা হয়েছে।",
+		BladyRunning:          "🤖 Blady এখন %s প্রোভাইডার এবং %s মডেলের সাথে চলছে।",
 	},
 	LangRussian: {
 		Intro:                 "🥔 Привет! Я Batata, простое ядро, которое управляет базовой инфраструктурой Blady. Давайте всё настроим!",
@@ -216,6 +222,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Мозг настроен на Ollama!",
 		BrainSetCerebras:      "🧠 Мозг настроен на Cerebras!",
 		BrainSetNone:          "🧠 Мозг отключен (Оффлайн).",
+		BladyRunning:          "🤖 Blady теперь запущен с провайдером %s и моделью: %s.",
 	},
 	LangJapanese: {
 		Intro:                 "🥔 こんにちは！私はBatataです。Bladyの基本インフラを担当するシンプルなコアです。設定を始めましょう！",
@@ -241,6 +248,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 脳をOllamaに設定しました！",
 		BrainSetCerebras:      "🧠 脳をCerebrasに設定しました！",
 		BrainSetNone:          "🧠 脳をなし（オフライン）に設定しました。",
+		BladyRunning:          "🤖 Bladyは現在、プロバイダー %s とモデル %s で動作しています。",
 	},
 	LangPunjabi: {
 		Intro:                 "🥔 ਇਹ Batata ਹੈ, ਇੱਕ ਘੱਟ-ਮਿਹਨਤ ਵਾਲਾ ਸਧਾਰਨ ਕੋਰ ਜੋ whatsabladerunner ਦੇ ਮੁੱਖ Blady ਕੋਰ ਲਈ ਬੁਨਿਆਦੀ ਢਾਂਚੇ ਦਾ ਧਿਆਨ ਰੱਖਦਾ ਹੈ। ਬੁਨਿਆਦੀ ਸੰਰਚਨਾ ਅੱਗੇ ਹੋਵੇਗੀ।",
@@ -266,6 +274,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 ਦਿਮਾਗ Ollama 'ਤੇ ਸੈੱਟ ਕੀਤਾ ਗਿਆ!",
 		BrainSetCerebras:      "🧠 ਦਿਮਾਗ Cerebras 'ਤੇ ਸੈੱਟ ਕੀਤਾ ਗਿਆ!",
 		BrainSetNone:          "🧠 ਦਿਮਾਗ ਕੋਈ ਨਹੀਂ (ਆਫਲਾਈਨ) ਸੈੱਟ ਕੀਤਾ ਗਿਆ।",
+		BladyRunning:          "🤖 Blady ਹੁਣ %s ਪ੍ਰਦਾਤਾ ਅਤੇ %s ਮਾਡਲ ਨਾਲ ਚੱਲ ਰਿਹਾ ਹੈ।",
 	},
 	LangVietnamese: {
 		Intro:                 "🥔 Đây là Batata, lõi đơn giản ít nỗ lực chịu trách nhiệm về cơ sở hạ tầng cơ bản cho lõi Blady chính của whatsabladerunner. Cấu hình cơ bản sẽ theo sau.",
@@ -291,6 +300,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Não đã được đặt thành Ollama!",
 		BrainSetCerebras:      "🧠 Não đã được đặt thành Cerebras!",
 		BrainSetNone:          "🧠 Não đã được đặt thành Không có (Ngoại tuyến).",
+		BladyRunning:          "🤖 Blady hiện đang chạy với nhà cung cấp %s và mô hình: %s.",
 	},
 	LangGerman: {
 		Intro:                 "🥔 Hey! Ich bin Batata, der einfache Kern, der die grundlegende Infrastruktur für Blady verwaltet. Lass uns alles einrichten!",
@@ -316,6 +326,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Gehirn auf Ollama gesetzt!",
 		BrainSetCerebras:      "🧠 Gehirn auf Cerebras gesetzt!",
 		BrainSetNone:          "🧠 Gehirn auf Keine (Offline) gesetzt.",
+		BladyRunning:          "🤖 Blady läuft jetzt mit dem Anbieter %s und dem Modell: %s.",
 	},
 	LangFrench: {
 		Intro:                 "🥔 Salut ! Je suis Batata, le noyau simple qui gère l'infrastructure de base pour Blady. Configurons tout ça !",
@@ -341,6 +352,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Cerveau défini sur Ollama !",
 		BrainSetCerebras:      "🧠 Cerveau défini sur Cerebras !",
 		BrainSetNone:          "🧠 Cerveau défini sur Aucun (Hors ligne).",
+		BladyRunning:          "🤖 Blady fonctionne maintenant avec le fournisseur %s et le modèle : %s.",
 	},
 	LangItalian: {
 		Intro:                 "🥔 Ciao! Sono Batata, il nucleo semplice che gestisce l'infrastruttura di base per Blady. Configuriamo tutto!",
@@ -366,6 +378,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Cervello impostato su Ollama!",
 		BrainSetCerebras:      "🧠 Cervello impostato su Cerebras!",
 		BrainSetNone:          "🧠 Cervello impostato su Nessuno (Offline).",
+		BladyRunning:          "🤖 Blady è ora in esecuzione con il provider %s e il modello: %s.",
 	},
 	LangArabic: {
 		Intro:                 "🥔 مرحبًا! أنا Batata، النواة البسيطة التي تدير البنية التحتية الأساسية لـ Blady. دعنا نقم بإعداد كل شيء!",
@@ -391,6 +404,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 تم ضبط الدماغ على Ollama!",
 		BrainSetCerebras:      "🧠 تم ضبط الدماغ على Cerebras!",
 		BrainSetNone:          "🧠 تم ضبط الدماغ على لا شيء (غير متصل).",
+		BladyRunning:          "🤖 يعمل Blady الآن مع المزود %s والطراز: %s.",
 	},
 	LangTurkish: {
 		Intro:                 "🥔 Merhaba! Ben Batata, Blady için temel altyapıyı yöneten basit çekirdeğim. Hadi her şeyi ayarlayalım!",
@@ -416,6 +430,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Beyin Ollama olarak ayarlandı!",
 		BrainSetCerebras:      "🧠 Beyin Cerebras olarak ayarlandı!",
 		BrainSetNone:          "🧠 Beyin Hiçbiri (Çevrimdışı) olarak ayarlandı.",
+		BladyRunning:          "🤖 Blady şu anda %s sağlayıcısı ve %s modeli ile çalışıyor.",
 	},
 	LangIndonesian: {
 		Intro:                 "🥔 Halo! Saya Batata, core sederhana yang menangani infrastruktur dasar untuk Blady. Ayo siapkan semuanya!",
@@ -441,6 +456,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetOllama:        "🧠 Otak disetel ke Ollama!",
 		BrainSetCerebras:      "🧠 Otak disetel ke Cerebras!",
 		BrainSetNone:          "🧠 Otak disetel ke Tidak Ada (Offline).",
+		BladyRunning:          "🤖 Blady sekarang berjalan dengan penyedia %s dan model: %s.",
 	},
 }
 

@@ -230,10 +230,13 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 		case "3":
 			k.Config.BrainProvider = "none"
 			sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetNone })))
+		default:
+			sendFunc(msg(k.s(func(s Strings) string { return s.InvalidInput })))
+			return true
 		}
 		k.Save()
-		k.State = StateMainMenu
-		k.sendMenu(sendFunc)
+		sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
+		k.State = StateIdle
 		return true
 	}
 
@@ -260,9 +263,19 @@ func (k *Kernel) sendMenu(sendFunc func(string)) {
 
 func (k *Kernel) finishConfig(sendFunc func(string)) {
 	k.Save()
-	if k.Config.BrainProvider == "none" {
+
+	// Notify about brain setting
+	switch k.Config.BrainProvider {
+	case "ollama":
+		sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetOllama })))
+	case "cerebras":
+		sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetCerebras })))
+	case "none":
+		sendFunc(msg(k.s(func(s Strings) string { return s.BrainSetNone })))
 		sendFunc(msg(k.s(func(s Strings) string { return s.BrainOffline })))
 	}
+
 	sendFunc(msg(k.s(func(s Strings) string { return s.ConfigSaved })))
+	sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
 	k.State = StateIdle
 }

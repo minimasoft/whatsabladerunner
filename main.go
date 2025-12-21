@@ -235,7 +235,7 @@ func eventHandler(evt interface{}) {
 					// It's safer to re-init on demand or check a "Dirty" flag.
 					// For simplicity, we'll re-init LLM client if Batata is IDLE after handling (meaning it exited a menu).
 					if batataKernel.State == batata.StateIdle {
-						reinitLLM()
+						reinitLLM(v.Info.Chat)
 					}
 					return
 				}
@@ -567,7 +567,7 @@ func main() {
 	}
 
 	// Initialize LLM client based on Batata Config
-	reinitLLM()
+	reinitLLM(types.EmptyJID)
 	convManager = agent.NewConversationManager()
 	taskLocks = locks.New()
 	buttonManager = buttons.NewManager()
@@ -884,9 +884,11 @@ func getAllContactsJSON(client *whatsmeow.Client) string {
 	return string(jsonData)
 }
 
-func reinitLLM() {
+func reinitLLM(notifyJID types.JID) {
 	cfg := batataKernel.Config
 	fmt.Printf("Re-initializing LLM. Provider: %s\n", cfg.BrainProvider)
+
+	var providerName, modelName string
 
 	switch cfg.BrainProvider {
 	case "cerebras":
@@ -900,6 +902,8 @@ func reinitLLM() {
 		if model == "" {
 			model = "gpt-oss-120b"
 		}
+		providerName = "Cerebras"
+		modelName = model
 
 		llmClient, err = cerebras.NewClientWithKey(key, model)
 		if err != nil {
@@ -919,6 +923,9 @@ func reinitLLM() {
 		if model == "" {
 			model = "qwen3:8b"
 		}
+		providerName = "Ollama"
+		modelName = model
+
 		// Construct URL
 		url := host
 		if !strings.HasPrefix(url, "http") {
@@ -930,13 +937,34 @@ func reinitLLM() {
 	case "none":
 		fmt.Println("LLM Provider is NONE.")
 		llmClient = nil
+		providerName = "None"
 	default:
 		// Default to none
 		llmClient = nil
+		providerName = "None"
 	}
 
 	// Update TaskBot if it exists
 	if taskBot != nil {
 		taskBot.Client = llmClient
+	}
+
+	// Notify if JID is provided and provider is not "none"
+	if !notifyJID.IsEmpty() && cfg.BrainProvider != "none" {
+		msgTemplate := batata.GetString(cfg.Language, func(s batata.Strings) string { return s.BladyRunning })
+		msgText := fmt.Sprintf(msgTemplate, providerName, modelName)
+
+		go func() {
+			// Small delay to ensure previous Batata messages are sent first if this was triggered by exiting Batata
+			time.Sleep(500 * time.Millisecond)
+			if whatsAppClient != nil {
+				_, err := whatsAppClient.SendMessage(context.Background(), notifyJID, &waProto.Message{
+					Conversation: proto.String(msgText),
+				})
+				if err != nil {
+					fmt.Printf("Failed to send Blady activation message: %v\n", err)
+				}
+			}
+		}()
 	}
 }
