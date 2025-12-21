@@ -65,6 +65,7 @@ type Strings struct {
 	BrainSetCerebras      string
 	BrainSetNone          string
 	BladyRunning          string
+	InvalidCerebrasKey    string
 }
 
 var LangStrings = map[Language]Strings{
@@ -75,7 +76,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Configurando Ollama...",
 		CerebrasConfig:        "☁️ Configurando Cerebras. Nota: Los contactos y mensajes se enviarán a Cerebras.",
 		CerebrasKey:           "🔑 Ingresa tu API Key de Cerebras (cuota gratis disponible):",
-		CerebrasModel:         "🤖 Ingresa el Modelo de Cerebras (sugerido: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Elige el Modelo de Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ingresa el Host de Ollama (IP/URL):",
 		OllamaPort:            "🔌 Ingresa el Puerto de Ollama (default 11434):",
 		OllamaModel:           "🤖 Ingresa el Modelo de Ollama (sugerido: gpt-oss:20b o qwen30b+):",
@@ -93,6 +94,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 ¡Cerebro configurado a Cerebras!",
 		BrainSetNone:          "🧠 Cerebro configurado a Ninguno (Offline).",
 		BladyRunning:          "🤖 Blady ya está funcionando con el proveedor %s y el modelo: %s.",
+		InvalidCerebrasKey:    "❌ API key demasiado corta (min 20 chars). Volviendo...",
 	},
 	LangEnglish: {
 		Intro:                 "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
@@ -101,7 +103,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Configuring Ollama...",
 		CerebrasConfig:        "☁️ Configuring Cerebras. Note: Contact info and messages will be sent to Cerebras.",
 		CerebrasKey:           "🔑 Enter your Cerebras API Key (free quota available):",
-		CerebrasModel:         "🤖 Enter Cerebras Model (suggested: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Choose Cerebras Model:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Enter Ollama Host (IP/URL):",
 		OllamaPort:            "🔌 Enter Ollama Port (default 11434):",
 		OllamaModel:           "🤖 Enter Ollama Model (suggested: gpt-oss:20b or qwen30b+):",
@@ -119,6 +121,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Brain set to Cerebras!",
 		BrainSetNone:          "🧠 Brain set to None (Offline).",
 		BladyRunning:          "🤖 Blady is now running with provider %s and model: %s.",
+		InvalidCerebrasKey:    "❌ API key too short (min 20 chars). Going back...",
 	},
 	LangHindi: {
 		Intro:                 "🥔 नमस्ते! मैं Batata हूँ, वह सरल कोर जो Blady के लिए बुनियादी ढांचे को संभालता है। आइए सब कुछ सेट करें!",
@@ -127,7 +130,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Ollama कॉन्फ़िगर हो रहा है...",
 		CerebrasConfig:        "☁️ Cerebras कॉन्फ़िगर हो रहा है। नोट: संपर्क जानकारी और संदेश Cerebras को भेजे जाएंगे।",
 		CerebrasKey:           "🔑 अपना Cerebras API Key दर्ज करें (मुफ्त कोटा उपलब्ध):",
-		CerebrasModel:         "🤖 Cerebras मॉडल दर्ज करें (सुझाव: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Cerebras मॉडल चुनें:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ollama होस्ट दर्ज करें (IP/URL):",
 		OllamaPort:            "🔌 Ollama पोर्ट दर्ज करें (डिफ़ॉल्ट 11434):",
 		OllamaModel:           "🤖 Ollama मॉडल दर्ज करें (सुझाव: gpt-oss:20b या qwen30b+):",
@@ -145,6 +148,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 दिमाग Cerebras पर सेट किया गया!",
 		BrainSetNone:          "🧠 दिमाग किसी पर नहीं (ऑफ़लाइन) सेट किया गया।",
 		BladyRunning:          "🤖 Blady अब %s प्रदाता और %s मॉडल के साथ चल रहा है।",
+		InvalidCerebrasKey:    "❌ API key बहुत छोटी है (कम से कम 20 वर्ण)। वापस जा रहे हैं...",
 	},
 	LangPortuguese: {
 		Intro:                 "🥔 Olá! Sou o Batata, o núcleo simples que cuida da infraestrutura básica do Blady. Vamos configurar tudo!",
@@ -153,7 +157,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Configurando Ollama...",
 		CerebrasConfig:        "☁️ Configurando Cerebras. Nota: Informações de contato e mensagens serão enviadas para o Cerebras.",
 		CerebrasKey:           "🔑 Insira sua chave de API do Cerebras (cota gratuita disponível):",
-		CerebrasModel:         "🤖 Insira o modelo Cerebras (sugerido: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Escolha o modelo Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Insira o host do Ollama (IP/URL):",
 		OllamaPort:            "🔌 Insira a porta do Ollama (padrão 11434):",
 		OllamaModel:           "🤖 Insira o modelo Ollama (sugerido: gpt-oss:20b ou qwen30b+):",
@@ -171,6 +175,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Cérebro definido para Cerebras!",
 		BrainSetNone:          "🧠 Cérebro definido como Nenhum (Offline).",
 		BladyRunning:          "🤖 Blady agora está rodando com o provedor %s e modelo: %s.",
+		InvalidCerebrasKey:    "❌ Chave de API muito curta (mín. 20 caracteres). Voltando...",
 	},
 	LangBengali: {
 		Intro:                 "🥔 এটি Batata, একটি কম-প্রচেষ্টার সরল কোর যা whatsabladerunner-এর প্রধান Blady কোরের জন্য মৌলিক অবকাঠামো পরিচালনা করে। মৌলিক কনফিগারেশন অনুসরণ করবে।",
@@ -179,7 +184,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Ollama কনফিগার করা হচ্ছে...",
 		CerebrasConfig:        "☁️ Cerebras কনফিগার করা হচ্ছে। দ্রষ্টব্য: যোগাযোগের তথ্য এবং বার্তা Cerebras-এ পাঠানো হবে।",
 		CerebrasKey:           "🔑 অনুগ্রহ করে আপনার Cerebras ডেভেলপার API কী লিখুন (বিনামূল্যে কোটা উপলব্ধ):",
-		CerebrasModel:         "🤖 Cerebras মডেল লিখুন (প্রস্তাবিত: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Cerebras মডেল চয়ন করুন:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ollama হোস্ট লিখুন (IP/URL):",
 		OllamaPort:            "🔌 Ollama পোর্ট লিখুন (ডিফল্ট 11434):",
 		OllamaModel:           "🤖 Ollama মডেল লিখুন (প্রস্তাবিত: gpt-oss:20b বা qwen30b+):",
@@ -197,6 +202,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 মস্তিষ্ক Cerebras-এ সেট করা হয়েছে!",
 		BrainSetNone:          "🧠 মস্তিষ্ক কোনোটিই নয় (অফলাইন) সেট করা হয়েছে।",
 		BladyRunning:          "🤖 Blady এখন %s প্রোভাইডার এবং %s মডেলের সাথে চলছে।",
+		InvalidCerebrasKey:    "❌ API কী খুব ছোট (ন্যূনতম ২০ অক্ষর)। ফিরে যাচ্ছি...",
 	},
 	LangRussian: {
 		Intro:                 "🥔 Привет! Я Batata, простое ядро, которое управляет базовой инфраструктурой Blady. Давайте всё настроим!",
@@ -205,7 +211,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Настраиваем Ollama...",
 		CerebrasConfig:        "☁️ Настраиваем Cerebras. Примечание: контакты и сообщения будут отправляться в Cerebras.",
 		CerebrasKey:           "🔑 Введите ваш API Key для Cerebras (доступна бесплатная квота):",
-		CerebrasModel:         "🤖 Введите модель Cerebras (рекомендуется: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Выберите модель Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Введите хост Ollama (IP/URL):",
 		OllamaPort:            "🔌 Введите порт Ollama (по умолчанию 11434):",
 		OllamaModel:           "🤖 Введите модель Ollama (рекомендуется: gpt-oss:20b или qwen30b+):",
@@ -223,6 +229,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Мозг настроен на Cerebras!",
 		BrainSetNone:          "🧠 Мозг отключен (Оффлайн).",
 		BladyRunning:          "🤖 Blady теперь запущен с провайдером %s и моделью: %s.",
+		InvalidCerebrasKey:    "❌ API-ключ слишком короткий (минимум 20 символов). Возвращаемся...",
 	},
 	LangJapanese: {
 		Intro:                 "🥔 こんにちは！私はBatataです。Bladyの基本インフラを担当するシンプルなコアです。設定を始めましょう！",
@@ -231,7 +238,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Ollamaを設定中...",
 		CerebrasConfig:        "☁️ Cerebrasを設定中。注意：連絡先情報とメッセージはCerebrasに送信されます。",
 		CerebrasKey:           "🔑 Cerebras APIキーを入力してください（無料枠あり）：",
-		CerebrasModel:         "🤖 Cerebrasモデルを入力（推奨：gpt-oss:120b）：",
+		CerebrasModel:         "🤖 Cerebrasモデルを選択してください：\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ollamaホストを入力（IP/URL）：",
 		OllamaPort:            "🔌 Ollamaポートを入力（デフォルト11434）：",
 		OllamaModel:           "🤖 Ollamaモデルを入力（推奨：gpt-oss:20bまたはqwen30b+）：",
@@ -249,6 +256,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 脳をCerebrasに設定しました！",
 		BrainSetNone:          "🧠 脳をなし（オフライン）に設定しました。",
 		BladyRunning:          "🤖 Bladyは現在、プロバイダー %s とモデル %s で動作しています。",
+		InvalidCerebrasKey:    "❌ APIキーが短すぎます（最低20文字）。戻ります...",
 	},
 	LangPunjabi: {
 		Intro:                 "🥔 ਇਹ Batata ਹੈ, ਇੱਕ ਘੱਟ-ਮਿਹਨਤ ਵਾਲਾ ਸਧਾਰਨ ਕੋਰ ਜੋ whatsabladerunner ਦੇ ਮੁੱਖ Blady ਕੋਰ ਲਈ ਬੁਨਿਆਦੀ ਢਾਂਚੇ ਦਾ ਧਿਆਨ ਰੱਖਦਾ ਹੈ। ਬੁਨਿਆਦੀ ਸੰਰਚਨਾ ਅੱਗੇ ਹੋਵੇਗੀ।",
@@ -257,7 +265,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Ollama ਸੰਰਚਿਤ ਹੋ ਰਿਹਾ ਹੈ...",
 		CerebrasConfig:        "☁️ Cerebras ਸੰਰਚਿਤ ਹੋ ਰਿਹਾ ਹੈ। ਨੋਟ: ਸੰਪਰਕ ਜਾਣਕਾਰੀ ਅਤੇ ਸੁਨੇਹੇ Cerebras ਨੂੰ ਭੇਜੇ ਜਾਣਗੇ।",
 		CerebrasKey:           "🔑 ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ Cerebras ਡਿਵੈਲਪਰ API ਕੁੰਜੀ ਦਾਖਲ ਕਰੋ (ਮੁਫ਼ਤ ਕੋਟਾ ਉਪਲਬਧ):",
-		CerebrasModel:         "🤖 Cerebras ਮਾਡਲ ਦਾਖਲ ਕਰੋ (ਸੁਝਾਅ: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Cerebras ਮਾਡਲ ਚੁਣੋ:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ollama ਹੋਸਟ ਦਾਖਲ ਕਰੋ (IP/URL):",
 		OllamaPort:            "🔌 Ollama ਪੋਰਟ ਦਾਖਲ ਕਰੋ (ਮੂਲ 11434):",
 		OllamaModel:           "🤖 Ollama ਮਾਡਲ ਦਾਖਲ ਕਰੋ (ਸੁਝਾਅ: gpt-oss:20b ਜਾਂ qwen30b+):",
@@ -275,6 +283,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 ਦਿਮਾਗ Cerebras 'ਤੇ ਸੈੱਟ ਕੀਤਾ ਗਿਆ!",
 		BrainSetNone:          "🧠 ਦਿਮਾਗ ਕੋਈ ਨਹੀਂ (ਆਫਲਾਈਨ) ਸੈੱਟ ਕੀਤਾ ਗਿਆ।",
 		BladyRunning:          "🤖 Blady ਹੁਣ %s ਪ੍ਰਦਾਤਾ ਅਤੇ %s ਮਾਡਲ ਨਾਲ ਚੱਲ ਰਿਹਾ ਹੈ।",
+		InvalidCerebrasKey:    "❌ API ਕੁੰਜੀ ਬਹੁਤ ਛੋਟੀ ਹੈ (ਘੱਟੋ-ਘੱਟ 20 ਅੱਖਰ)। ਵਾਪਸ ਜਾ ਰਹੇ ਹੋ...",
 	},
 	LangVietnamese: {
 		Intro:                 "🥔 Đây là Batata, lõi đơn giản ít nỗ lực chịu trách nhiệm về cơ sở hạ tầng cơ bản cho lõi Blady chính của whatsabladerunner. Cấu hình cơ bản sẽ theo sau.",
@@ -283,7 +292,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Đang cấu hình Ollama...",
 		CerebrasConfig:        "☁️ Đang cấu hình Cerebras. Lưu ý: Thông tin liên hệ và tin nhắn sẽ được gửi đến Cerebras.",
 		CerebrasKey:           "🔑 Vui lòng nhập API Key nhà phát triển Cerebras của bạn (có hạn ngạch miễn phí):",
-		CerebrasModel:         "🤖 Nhập mô hình Cerebras (đề xuất: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Chọn mô hình Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Nhập máy chủ Ollama (IP/URL):",
 		OllamaPort:            "🔌 Nhập cổng Ollama (mặc định 11434):",
 		OllamaModel:           "🤖 Nhập mô hình Ollama (đề xuất: gpt-oss:20b hoặc qwen30b+):",
@@ -301,6 +310,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Não đã được đặt thành Cerebras!",
 		BrainSetNone:          "🧠 Não đã được đặt thành Không có (Ngoại tuyến).",
 		BladyRunning:          "🤖 Blady hiện đang chạy với nhà cung cấp %s và mô hình: %s.",
+		InvalidCerebrasKey:    "❌ API key quá ngắn (tối thiểu 20 ký tự). Đang quay lại...",
 	},
 	LangGerman: {
 		Intro:                 "🥔 Hey! Ich bin Batata, der einfache Kern, der die grundlegende Infrastruktur für Blady verwaltet. Lass uns alles einrichten!",
@@ -309,7 +319,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Konfiguriere Ollama...",
 		CerebrasConfig:        "☁️ Konfiguriere Cerebras. Hinweis: Kontaktinfos und Nachrichten werden an Cerebras gesendet.",
 		CerebrasKey:           "🔑 Gib deinen Cerebras API Key ein (kostenloses Kontingent verfügbar):",
-		CerebrasModel:         "🤖 Gib das Cerebras Modell ein (Vorschlag: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Wähle das Cerebras-Modell:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Gib den Ollama Host ein (IP/URL):",
 		OllamaPort:            "🔌 Gib den Ollama Port ein (Standard 11434):",
 		OllamaModel:           "🤖 Gib das Ollama Modell ein (Vorschlag: gpt-oss:20b oder qwen30b+):",
@@ -327,6 +337,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Gehirn auf Cerebras gesetzt!",
 		BrainSetNone:          "🧠 Gehirn auf Keine (Offline) gesetzt.",
 		BladyRunning:          "🤖 Blady läuft jetzt mit dem Anbieter %s und dem Modell: %s.",
+		InvalidCerebrasKey:    "❌ API-Key zu kurz (min. 20 Zeichen). Zurück...",
 	},
 	LangFrench: {
 		Intro:                 "🥔 Salut ! Je suis Batata, le noyau simple qui gère l'infrastructure de base pour Blady. Configurons tout ça !",
@@ -335,7 +346,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Configuration d'Ollama...",
 		CerebrasConfig:        "☁️ Configuration de Cerebras. Note : Les informations de contact et les messages seront envoyés à Cerebras.",
 		CerebrasKey:           "🔑 Entrez votre clé API Cerebras (quota gratuit disponible) :",
-		CerebrasModel:         "🤖 Entrez le modèle Cerebras (suggéré : gpt-oss:120b) :",
+		CerebrasModel:         "🤖 Choisissez le modèle Cerebras :\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Entrez l'hôte Ollama (IP/URL) :",
 		OllamaPort:            "🔌 Entrez le port Ollama (par défaut 11434) :",
 		OllamaModel:           "🤖 Entrez le modèle Ollama (suggéré : gpt-oss:20b ou qwen30b+) :",
@@ -353,6 +364,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Cerveau défini sur Cerebras !",
 		BrainSetNone:          "🧠 Cerveau défini sur Aucun (Hors ligne).",
 		BladyRunning:          "🤖 Blady fonctionne maintenant avec le fournisseur %s et le modèle : %s.",
+		InvalidCerebrasKey:    "❌ Clé API trop courte (min 20 caractères). Retour...",
 	},
 	LangItalian: {
 		Intro:                 "🥔 Ciao! Sono Batata, il nucleo semplice che gestisce l'infrastruttura di base per Blady. Configuriamo tutto!",
@@ -361,7 +373,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Configurazione di Ollama...",
 		CerebrasConfig:        "☁️ Configurazione di Cerebras. Nota: le informazioni di contatto e i messaggi saranno inviati a Cerebras.",
 		CerebrasKey:           "🔑 Inserisci la tua API Key di Cerebras (quota gratuita disponibile):",
-		CerebrasModel:         "🤖 Inserisci il modello Cerebras (suggerito: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Scegli il modello Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Inserisci l'host Ollama (IP/URL):",
 		OllamaPort:            "🔌 Inserisci la porta Ollama (predefinita 11434):",
 		OllamaModel:           "🤖 Inserisci il modello Ollama (suggerito: gpt-oss:20b o qwen30b+):",
@@ -379,6 +391,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Cervello impostato su Cerebras!",
 		BrainSetNone:          "🧠 Cervello impostato su Nessuno (Offline).",
 		BladyRunning:          "🤖 Blady è ora in esecuzione con il provider %s e il modello: %s.",
+		InvalidCerebrasKey:    "❌ API key troppo corta (min 20 caratteri). Torno indietro...",
 	},
 	LangArabic: {
 		Intro:                 "🥔 مرحبًا! أنا Batata، النواة البسيطة التي تدير البنية التحتية الأساسية لـ Blady. دعنا نقم بإعداد كل شيء!",
@@ -387,7 +400,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ جاري إعداد Ollama...",
 		CerebrasConfig:        "☁️ جاري إعداد Cerebras. ملاحظة: سيتم إرسال معلومات الاتصال والرسائل إلى Cerebras.",
 		CerebrasKey:           "🔑 أدخل مفتاح API الخاص بـ Cerebras (يتوفر حصة مجانية):",
-		CerebrasModel:         "🤖 أدخل نموذج Cerebras (المقترح: gpt-oss:120b):",
+		CerebrasModel:         "🤖 اختر نموذج Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 أدخل مضيف Ollama (IP/URL):",
 		OllamaPort:            "🔌 أدخل منفذ Ollama (الافتراضي 11434):",
 		OllamaModel:           "🤖 أدخل نموذج Ollama (المقترح: gpt-oss:20b أو qwen30b+):",
@@ -405,6 +418,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 تم ضبط الدماغ على Cerebras!",
 		BrainSetNone:          "🧠 تم ضبط الدماغ على لا شيء (غير متصل).",
 		BladyRunning:          "🤖 يعمل Blady الآن مع المزود %s والطراز: %s.",
+		InvalidCerebrasKey:    "❌ مفتاح API قصير جدًا (20 حرفًا على الأقل). جاري العودة...",
 	},
 	LangTurkish: {
 		Intro:                 "🥔 Merhaba! Ben Batata, Blady için temel altyapıyı yöneten basit çekirdeğim. Hadi her şeyi ayarlayalım!",
@@ -413,7 +427,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Ollama yapılandırılıyor...",
 		CerebrasConfig:        "☁️ Cerebras yapılandırılıyor. Not: Kişi bilgileri ve mesajlar Cerebras'a gönderilecektir.",
 		CerebrasKey:           "🔑 Cerebras API Anahtarınızı girin (ücretsiz kota mevcuttur):",
-		CerebrasModel:         "🤖 Cerebras Modelini girin (önerilen: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Cerebras Modelini seçin:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Ollama Hostunu girin (IP/URL):",
 		OllamaPort:            "🔌 Ollama Portunu girin (varsayılan 11434):",
 		OllamaModel:           "🤖 Ollama Modelini girin (önerilen: gpt-oss:20b veya qwen30b+):",
@@ -431,6 +445,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Beyin Cerebras olarak ayarlandı!",
 		BrainSetNone:          "🧠 Beyin Hiçbiri (Çevrimdışı) olarak ayarlandı.",
 		BladyRunning:          "🤖 Blady şu anda %s sağlayıcısı ve %s modeli ile çalışıyor.",
+		InvalidCerebrasKey:    "❌ API anahtarı çok kısa (en az 20 karakter). Geri dönülüyor...",
 	},
 	LangIndonesian: {
 		Intro:                 "🥔 Halo! Saya Batata, core sederhana yang menangani infrastruktur dasar untuk Blady. Ayo siapkan semuanya!",
@@ -439,7 +454,7 @@ var LangStrings = map[Language]Strings{
 		OllamaConfig:          "⚙️ Mengonfigurasi Ollama...",
 		CerebrasConfig:        "☁️ Mengonfigurasi Cerebras. Catatan: Info kontak dan pesan akan dikirim ke Cerebras.",
 		CerebrasKey:           "🔑 Masukkan API Key Cerebras Anda (kuota gratis tersedia):",
-		CerebrasModel:         "🤖 Masukkan Model Cerebras (saran: gpt-oss:120b):",
+		CerebrasModel:         "🤖 Pilih Model Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
 		OllamaHost:            "🌐 Masukkan Host Ollama (IP/URL):",
 		OllamaPort:            "🔌 Masukkan Port Ollama (default 11434):",
 		OllamaModel:           "🤖 Masukkan Model Ollama (saran: gpt-oss:20b atau qwen30b+):",
@@ -457,6 +472,7 @@ var LangStrings = map[Language]Strings{
 		BrainSetCerebras:      "🧠 Otak disetel ke Cerebras!",
 		BrainSetNone:          "🧠 Otak disetel ke Tidak Ada (Offline).",
 		BladyRunning:          "🤖 Blady sekarang berjalan dengan penyedia %s dan model: %s.",
+		InvalidCerebrasKey:    "❌ API key terlalu pendek (minimal 20 karakter). Kembali...",
 	},
 }
 

@@ -177,11 +177,30 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 	case StateSetupCerebras:
 		switch k.tempInputStep {
 		case 0:
+			if len(cleanMsg) < 20 {
+				sendFunc(msg(k.s(func(s Strings) string { return s.InvalidCerebrasKey })))
+				k.State = StateSetupLLMChoice
+				sendFunc(menu(k.s(func(s Strings) string { return s.ChooseLLM + "\n" + s.LLMOptions })))
+				return true
+			}
 			k.Config.CerebrasKey = cleanMsg
 			k.tempInputStep++
 			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasModel })))
 		case 1:
-			k.Config.CerebrasModel = cleanMsg
+			switch cleanMsg {
+			case "1":
+				k.Config.CerebrasModel = "qwen-3-235b-a22b-instruct-2507"
+			case "2":
+				k.Config.CerebrasModel = "zai-glm-4.6"
+			case "3":
+				k.Config.CerebrasModel = "gpt-oss-120b"
+			case "4":
+				k.Config.CerebrasModel = "llama-3.3-70b"
+			default:
+				sendFunc(msg(k.s(func(s Strings) string { return s.InvalidInput })))
+				sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasModel })))
+				return true
+			}
 			k.finishConfig(sendFunc)
 		}
 		return true
