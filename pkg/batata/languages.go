@@ -5,20 +5,18 @@ import "fmt"
 type Language int
 
 const (
-	LangMandarin   Language = 1
-	LangSpanish    Language = 2
-	LangEnglish    Language = 3
-	LangHindi      Language = 4
-	LangPortuguese Language = 5
-	LangBengali    Language = 6
-	LangRussian    Language = 7
-	LangJapanese   Language = 8
-	LangPunjabi    Language = 9
-	LangVietnamese Language = 10
+	LangSpanish    Language = 1
+	LangEnglish    Language = 2
+	LangHindi      Language = 3
+	LangPortuguese Language = 4
+	LangBengali    Language = 5
+	LangRussian    Language = 6
+	LangJapanese   Language = 7
+	LangPunjabi    Language = 8
+	LangVietnamese Language = 9
 )
 
 var SupportedLanguages = []string{
-	"普通话 (Mandarin Chinese)",
 	"Español (Spanish)",
 	"English",
 	"हिन्दी (Hindi)",
@@ -53,68 +51,47 @@ type Strings struct {
 }
 
 var LangStrings = map[Language]Strings{
-	LangMandarin: {
-		Intro:          "这是Batata，一个低功耗的简单核心，负责whatsabladerunner主核心Blady的基础设施。接下来是基本配置。",
-		ChooseLLM:      "配置哪个LLM引擎？",
-		LLMOptions:     "1. Ollama\n2. Cerebras\n3. 无",
-		OllamaConfig:   "正在配置Ollama...",
-		CerebrasConfig: "正在配置Cerebras。注意：联系信息和消息将发送到Cerebras。",
-		CerebrasKey:    "请输入您的Cerebras开发者API密钥（有免费配额）：",
-		CerebrasModel:  "输入Cerebras模型（建议：gpt-oss:120b）：",
-		OllamaHost:     "输入Ollama主机（IP/URL）：",
-		OllamaPort:     "输入Ollama端口（默认11434）：",
-		OllamaModel:    "输入Ollama模型（建议：gpt-oss:20b或qwen30b+）：",
-		ConfigSaved:    "配置已保存。需要更改配置时，只需说'Batata help'。",
-		MenuTitle:      "Batata基本菜单：",
-		MenuOptions:    "1. 更改语言\n2. 更新LLM配置\n3. 设置Blady的大脑\n4. 更新其他配置\n5. 终止whatsabladerunner\n6. 返回Blady",
-		KillGoodbye:    "正在终止whatsabladerunner...再见！",
-		InvalidInput:   "输入无效，请重试。",
-		BackToBlady:    "将控制权交还给Blady。",
-		MiscConfig:     "其他配置尚未实现。",
-		SetBrain:       "选择Blady大脑使用哪个LLM：",
-		BrainOffline:   "Blady的大脑已离线（未选择）。只能进行Batata核心交互。",
-	},
 	LangSpanish: {
-		Intro:          "Este es Batata, el núcleo tonto de bajo esfuerzo que se encarga de la infraestructura básica para el núcleo principal de Blady en whatsabladerunner. A continuación, la configuración básica.",
-		ChooseLLM:      "¿Qué motor LLM configurar?",
+		Intro:          "🥔 ¡Hola! Soy Batata, el núcleo tonto que maneja la infraestructura básica de Blady. ¡Configuremos todo!",
+		ChooseLLM:      "🤖 ¿Qué motor LLM?",
 		LLMOptions:     "1. Ollama\n2. Cerebras\n3. Ninguno",
-		OllamaConfig:   "Configurando Ollama...",
-		CerebrasConfig: "Configurando Cerebras. Nota: La información de contacto y los mensajes se enviarán a Cerebras.",
-		CerebrasKey:    "Por favor, introduce tu API Key de desarrollador de Cerebras (cuota gratuita disponible):",
-		CerebrasModel:  "Introduce el Modelo de Cerebras (sugerido: gpt-oss:120b):",
-		OllamaHost:     "Introduce el Host de Ollama (IP/URL):",
-		OllamaPort:     "Introduce el Puerto de Ollama (por defecto 11434):",
-		OllamaModel:    "Introduce el Modelo de Ollama (sugerido: gpt-oss:20b o qwen30b+):",
-		ConfigSaved:    "Configuración guardada. Cuando necesites cambiar algo, di 'Batata help'.",
-		MenuTitle:      "Menú Básico de Batata:",
-		MenuOptions:    "1. Cambiar idioma\n2. Actualizar config LLM\n3. Configurar cerebro de Blady\n4. Actualizar config misc\n5. Matar whatsabladerunner\n6. Volver a Blady",
-		KillGoodbye:    "Matando whatsabladerunner... ¡Adiós!",
-		InvalidInput:   "Entrada inválida, intenta de nuevo.",
-		BackToBlady:    "Devolviendo el control a Blady.",
-		MiscConfig:     "Configuración miscelánea no implementada aún.",
-		SetBrain:       "Elige qué LLM usar para el cerebro de Blady:",
-		BrainOffline:   "El cerebro de Blady está OFFLINE (Ninguno seleccionado). Solo interacciones con Batata core son posibles.",
+		OllamaConfig:   "⚙️ Configurando Ollama...",
+		CerebrasConfig: "☁️ Configurando Cerebras. Nota: Los contactos y mensajes se enviarán a Cerebras.",
+		CerebrasKey:    "🔑 Ingresa tu API Key de Cerebras (cuota gratis disponible):",
+		CerebrasModel:  "🤖 Ingresa el Modelo de Cerebras (sugerido: gpt-oss:120b):",
+		OllamaHost:     "🌐 Ingresa el Host de Ollama (IP/URL):",
+		OllamaPort:     "🔌 Ingresa el Puerto de Ollama (default 11434):",
+		OllamaModel:    "🤖 Ingresa el Modelo de Ollama (sugerido: gpt-oss:20b o qwen30b+):",
+		ConfigSaved:    "✅ ¡Config guardada! Di 'Batata help' cuando quieras cambiar algo.",
+		MenuTitle:      "🥔 Menú Batata",
+		MenuOptions:    "1. 🌍 Cambiar idioma\n2. ⚙️ Config LLM\n3. 🧠 Cerebro de Blady\n4. 🔧 Config misc\n5. ☠️ Matar app\n6. 👋 Volver a Blady",
+		KillGoodbye:    "☠️ Matando whatsabladerunner... ¡Chau!",
+		InvalidInput:   "❌ Entrada inválida, intenta de nuevo.",
+		BackToBlady:    "👋 ¡Devolviendo control a Blady!",
+		MiscConfig:     "🔧 Config misc no implementada aún.",
+		SetBrain:       "🧠 Elige LLM para el cerebro de Blady:",
+		BrainOffline:   "⚠️ El cerebro de Blady está OFFLINE. Solo Batata disponible.",
 	},
 	LangEnglish: {
-		Intro:          "This is Batata, the low-effort dumb core that takes care of the basic infrastructure for whatsabladerunner main Blady's core. Basic configuration will follow.",
-		ChooseLLM:      "Which LLM engine to config?",
+		Intro:          "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
+		ChooseLLM:      "🤖 Which LLM engine?",
 		LLMOptions:     "1. Ollama\n2. Cerebras\n3. None",
-		OllamaConfig:   "Configuring Ollama...",
-		CerebrasConfig: "Configuring Cerebras. Note: Contact info and messages will be sent to Cerebras.",
-		CerebrasKey:    "Please enter your Cerebras Developer API Key (free quota available):",
-		CerebrasModel:  "Enter Cerebras Model (suggested: gpt-oss:120b):",
-		OllamaHost:     "Enter Ollama Host (IP/URL):",
-		OllamaPort:     "Enter Ollama Port (default 11434):",
-		OllamaModel:    "Enter Ollama Model (suggested: gpt-oss:20b or qwen30b+):",
-		ConfigSaved:    "Configuration saved. Anytime you need to change config, just say 'Batata help'.",
-		MenuTitle:      "Batata Basic Menu:",
-		MenuOptions:    "1. Change language\n2. Update LLM config\n3. Set Blady's brain\n4. Update misc config\n5. Kill whatsabladerunner\n6. Back to Blady",
-		KillGoodbye:    "Killing whatsabladerunner... Bye!",
-		InvalidInput:   "Invalid input, please try again.",
-		BackToBlady:    "Returning control to Blady.",
-		MiscConfig:     "Misc config not implemented yet.",
-		SetBrain:       "Pick which LLM to use for Blady's brain:",
-		BrainOffline:   "Blady's brain is OFFLINE (None selected). Only Batata core interactions are possible.",
+		OllamaConfig:   "⚙️ Configuring Ollama...",
+		CerebrasConfig: "☁️ Configuring Cerebras. Note: Contact info and messages will be sent to Cerebras.",
+		CerebrasKey:    "🔑 Enter your Cerebras API Key (free quota available):",
+		CerebrasModel:  "🤖 Enter Cerebras Model (suggested: gpt-oss:120b):",
+		OllamaHost:     "🌐 Enter Ollama Host (IP/URL):",
+		OllamaPort:     "🔌 Enter Ollama Port (default 11434):",
+		OllamaModel:    "🤖 Enter Ollama Model (suggested: gpt-oss:20b or qwen30b+):",
+		ConfigSaved:    "✅ Config saved! Say 'Batata help' anytime to change settings.",
+		MenuTitle:      "🥔 Batata Menu",
+		MenuOptions:    "1. 🌍 Change language\n2. ⚙️ Update LLM config\n3. 🧠 Set Blady's brain\n4. 🔧 Misc config\n5. ☠️ Kill app\n6. 👋 Back to Blady",
+		KillGoodbye:    "☠️ Killing whatsabladerunner... Bye!",
+		InvalidInput:   "❌ Invalid input, try again.",
+		BackToBlady:    "👋 Returning control to Blady!",
+		MiscConfig:     "🔧 Misc config not implemented yet.",
+		SetBrain:       "🧠 Pick LLM for Blady's brain:",
+		BrainOffline:   "⚠️ Blady's brain is OFFLINE. Only Batata interactions available.",
 	},
 	LangHindi: {
 		Intro:          "यह Batata है, एक कम-प्रयास वाला सरल कोर जो whatsabladerunner के मुख्य Blady कोर के लिए बुनियादी ढांचे का ध्यान रखता है। बुनियादी कॉन्फ़िगरेशन आगे होगा।",

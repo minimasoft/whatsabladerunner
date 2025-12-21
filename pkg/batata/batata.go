@@ -90,7 +90,7 @@ func (k *Kernel) StartSetup(sendFunc func(string)) {
 	defer k.StateMu.Unlock()
 
 	k.State = StateSetupLanguage
-	sendFunc(LangSelectMenu())
+	sendFunc(menu(LangSelectMenu()))
 }
 
 // HandleMessage returns true if the message was consumed by Batata
@@ -124,56 +124,55 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 	// Process input based on state
 	switch k.State {
 	case StateSetupLanguage:
-		// Expecting 1-10
 		choice, err := strconv.Atoi(cleanMsg)
-		if err != nil || choice < 1 || choice > 10 {
-			sendFunc("Invalid choice. / Opción inválida. \n" + LangSelectMenu())
+		if err != nil || choice < 1 || choice > 9 {
+			sendFunc(menu("❌ Invalid / Inválido\n" + LangSelectMenu()))
 			return true
 		}
 		k.Config.Language = Language(choice)
-		// Proceed to Intro
 		k.State = StateSetupLLMChoice
 
 		intro := k.s(func(s Strings) string { return s.Intro })
 		prompt := k.s(func(s Strings) string { return s.ChooseLLM + "\n" + s.LLMOptions })
 
-		sendFunc(intro + "\n\n" + prompt)
+		sendFunc(msg(intro))
+		sendFunc(menu(prompt))
 		return true
 
 	case StateSetupLLMChoice:
 		switch cleanMsg {
-		case "1": // Ollama
+		case "1":
 			k.Config.LLMProvider = "ollama"
 			k.Config.BrainProvider = "ollama"
 			k.State = StateSetupOllama
 			k.tempInputStep = 0
-			sendFunc(k.s(func(s Strings) string { return s.OllamaHost }))
-		case "2": // Cerebras
+			sendFunc(msg(k.s(func(s Strings) string { return s.OllamaHost })))
+		case "2":
 			k.Config.LLMProvider = "cerebras"
 			k.Config.BrainProvider = "cerebras"
 			k.State = StateSetupCerebras
 			k.tempInputStep = 0
-			sendFunc(k.s(func(s Strings) string { return s.CerebrasConfig + "\n" + s.CerebrasKey }))
-		case "3": // None
+			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasConfig })))
+			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasKey })))
+		case "3":
 			k.Config.LLMProvider = "none"
 			k.Config.BrainProvider = "none"
 			k.finishConfig(sendFunc)
 		default:
-			sendFunc(k.s(func(s Strings) string { return s.InvalidInput }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.InvalidInput })))
 		}
 		return true
 
 	case StateSetupOllama:
-		// Step 0: Host, 1: Port, 2: Model
 		switch k.tempInputStep {
 		case 0:
 			k.Config.OllamaHost = cleanMsg
 			k.tempInputStep++
-			sendFunc(k.s(func(s Strings) string { return s.OllamaPort }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.OllamaPort })))
 		case 1:
 			k.Config.OllamaPort = cleanMsg
 			k.tempInputStep++
-			sendFunc(k.s(func(s Strings) string { return s.OllamaModel }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.OllamaModel })))
 		case 2:
 			k.Config.OllamaModel = cleanMsg
 			k.finishConfig(sendFunc)
@@ -181,12 +180,11 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 		return true
 
 	case StateSetupCerebras:
-		// Step 0: Key, 1: Model
 		switch k.tempInputStep {
 		case 0:
 			k.Config.CerebrasKey = cleanMsg
 			k.tempInputStep++
-			sendFunc(k.s(func(s Strings) string { return s.CerebrasModel }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasModel })))
 		case 1:
 			k.Config.CerebrasModel = cleanMsg
 			k.finishConfig(sendFunc)
@@ -195,28 +193,28 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 
 	case StateMainMenu:
 		switch cleanMsg {
-		case "1": // Change Language
+		case "1":
 			k.State = StateSetupLanguage
-			sendFunc(LangSelectMenu())
-		case "2": // Update LLM Config
+			sendFunc(menu(LangSelectMenu()))
+		case "2":
 			k.State = StateSetupLLMChoice
-			sendFunc(k.s(func(s Strings) string { return s.ChooseLLM + "\n" + s.LLMOptions }))
-		case "3": // Set Brain
+			sendFunc(menu(k.s(func(s Strings) string { return s.ChooseLLM + "\n" + s.LLMOptions })))
+		case "3":
 			k.State = StateSetBrain
-			sendFunc(k.s(func(s Strings) string { return s.SetBrain + "\n1. Ollama\n2. Cerebras\n3. None" }))
-		case "4": // Misc
-			sendFunc(k.s(func(s Strings) string { return s.MiscConfig }))
-			k.sendMenu(sendFunc) // Return to menu
-		case "5": // Kill
-			sendFunc(k.s(func(s Strings) string { return s.KillGoodbye }))
+			sendFunc(menu(k.s(func(s Strings) string { return s.SetBrain + "\n1. Ollama\n2. Cerebras\n3. None" })))
+		case "4":
+			sendFunc(msg(k.s(func(s Strings) string { return s.MiscConfig })))
+			k.sendMenu(sendFunc)
+		case "5":
+			sendFunc(msg(k.s(func(s Strings) string { return s.KillGoodbye })))
 			if killFunc != nil {
 				killFunc()
 			}
-		case "6": // Back to Blady
+		case "6":
 			k.State = StateIdle
-			sendFunc(k.s(func(s Strings) string { return s.BackToBlady }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
 		default:
-			sendFunc(k.s(func(s Strings) string { return s.InvalidInput }))
+			sendFunc(msg(k.s(func(s Strings) string { return s.InvalidInput })))
 			k.sendMenu(sendFunc)
 		}
 		return true
@@ -225,13 +223,13 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 		switch cleanMsg {
 		case "1":
 			k.Config.BrainProvider = "ollama"
-			sendFunc("Brain set to Ollama.")
+			sendFunc(msg("🧠 Brain set to Ollama!"))
 		case "2":
 			k.Config.BrainProvider = "cerebras"
-			sendFunc("Brain set to Cerebras.")
+			sendFunc(msg("🧠 Brain set to Cerebras!"))
 		case "3":
 			k.Config.BrainProvider = "none"
-			sendFunc("Brain set to None (Offline).")
+			sendFunc(msg("🧠 Brain set to None (Offline)."))
 		}
 		k.Save()
 		k.State = StateMainMenu
@@ -246,16 +244,25 @@ func (k *Kernel) s(selector func(Strings) string) string {
 	return GetString(k.Config.Language, selector)
 }
 
+// msg formats a single-line message with [Batata] prefix
+func msg(text string) string {
+	return "[Batata] " + text
+}
+
+// menu formats a multi-choice message with [Batata] prefix and line break
+func menu(text string) string {
+	return "[Batata]\n" + text
+}
+
 func (k *Kernel) sendMenu(sendFunc func(string)) {
-	sendFunc(k.s(func(s Strings) string { return s.MenuTitle + "\n" + s.MenuOptions }))
+	sendFunc(menu(k.s(func(s Strings) string { return s.MenuTitle + "\n" + s.MenuOptions })))
 }
 
 func (k *Kernel) finishConfig(sendFunc func(string)) {
 	k.Save()
-	// Warn if brain is offline
 	if k.Config.BrainProvider == "none" {
-		sendFunc(k.s(func(s Strings) string { return s.BrainOffline }))
+		sendFunc(msg(k.s(func(s Strings) string { return s.BrainOffline })))
 	}
-	sendFunc(k.s(func(s Strings) string { return s.ConfigSaved }))
+	sendFunc(msg(k.s(func(s Strings) string { return s.ConfigSaved })))
 	k.State = StateIdle
 }
