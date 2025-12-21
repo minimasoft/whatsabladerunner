@@ -350,7 +350,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	}
 
 	// 6. Parse Response
-	fmt.Printf("DEBUG: Raw Ollama Response (Task Mode):\n%s\n---------------------\n", respMsg.Content)
+	fmt.Printf("DEBUG: Raw Ollama Response (Task Mode) [Processing %d chars of input]:\n%s\n---------------------\n", len(msg), respMsg.Content)
 
 	content := respMsg.Content
 	content = cleanJSON(content)

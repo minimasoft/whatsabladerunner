@@ -20,12 +20,13 @@ const (
 
 // Task represents a task stored as a JSON file
 type Task struct {
-	ID             int    `json:"id"`
-	Objective      string `json:"objective"`
-	OriginalOrders string `json:"original_orders"`
-	Contact        string `json:"contact"`
-	ChatID         string `json:"chat_id,omitempty"` // Chat JID where task is active (may differ from Contact for bots)
-	Status         string `json:"status"`
+	ID                     int    `json:"id"`
+	Objective              string `json:"objective"`
+	OriginalOrders         string `json:"original_orders"`
+	Contact                string `json:"contact"`
+	ChatID                 string `json:"chat_id,omitempty"` // Chat JID where task is active (may differ from Contact for bots)
+	Status                 string `json:"status"`
+	LastProcessedTimestamp int64  `json:"last_processed_timestamp,omitempty"` // Unix timestamp of last processed message
 }
 
 // CreateTaskContent represents the content of a create_task action
@@ -373,5 +374,21 @@ func (tm *TaskManager) SetTaskChatID(id int, chatID string) error {
 	}
 
 	fmt.Printf("[TaskManager] Task %d chat ID updated: '%s' -> '%s'\n", id, oldChatID, chatID)
+	return nil
+}
+
+// SetTaskProcessedTimestamp updates the last processed timestamp for a task
+func (tm *TaskManager) SetTaskProcessedTimestamp(id int, timestamp int64) error {
+	task, err := tm.LoadTask(id)
+	if err != nil {
+		return err
+	}
+
+	task.LastProcessedTimestamp = timestamp
+	if err := tm.SaveTask(task); err != nil {
+		return err
+	}
+
+	// fmt.Printf("[TaskManager] Task %d processed timestamp updated to %d\n", id, timestamp)
 	return nil
 }
