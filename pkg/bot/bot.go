@@ -23,6 +23,12 @@ type Bot struct {
 	SendButtonResponseFunc func(displayText, buttonID string) // For sending button responses
 	Contacts               string                             // JSON formatted string of contacts
 	StartTaskCallback      func(*tasks.Task)                  // Called when a task is confirmed to start it
+
+	// OnWatcherBlock is called when watcher blocks a message, allowing the caller to store it for potential override
+	OnWatcherBlock func(blockedMsg string, targetChatJID string, sendFunc func(string))
+
+	// CurrentTaskID is set during ProcessTask to enable proper message tagging
+	CurrentTaskID int
 }
 
 func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
@@ -382,7 +388,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 			if err != nil {
 				fmt.Printf("Watcher check error: %v\n", err)
 				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("[System] Watcher error: %v", err))
+					b.SendMasterFunc(fmt.Sprintf("[Blady][Watcher] : Error: %v", err))
 				}
 				continue
 			}
@@ -390,7 +396,11 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 			if !proceed {
 				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", contentStr, reason)
 				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("Watcher stopped message %s. Reason: %s", contentStr, reason))
+					b.SendMasterFunc(fmt.Sprintf("[Blady][Watcher] : Blocked: \"%s\". Reason: %s ('LET IT BE' cancels block)", contentStr, reason))
+				}
+				// Store for potential override via OnWatcherBlock callback
+				if b.OnWatcherBlock != nil && sendToContact != nil {
+					b.OnWatcherBlock(contentStr, task.ChatID, sendToContact)
 				}
 				continue
 			}
@@ -409,7 +419,8 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 
 		case "message_master":
 			if b.SendMasterFunc != nil {
-				b.SendMasterFunc(contentStr)
+				// Use task-specific prefix when in task mode
+				b.SendMasterFunc(fmt.Sprintf("[Blady][Task %d] : %s", task.ID, contentStr))
 			}
 
 		case "pause_task":

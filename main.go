@@ -58,6 +58,16 @@ type ButtonsContext struct {
 // lastButtonsMessage stores the last buttons/list message per chat for context
 var lastButtonsMessage = make(map[string]*ButtonsContext)
 
+// WithheldMessage stores a blocked message for potential "LET IT BE" override
+type WithheldMessage struct {
+	Message       string       // The blocked message text
+	TargetChatJID types.JID    // Where to send if unblocked
+	SendFunc      func(string) // Function to use for sending
+}
+
+// lastWithheldMessage stores the most recent watcher-blocked message
+var lastWithheldMessage *WithheldMessage
+
 const BotPrefix = "[Blady] : "
 
 // Helper to strip metadata from quoted messages
@@ -221,6 +231,29 @@ func eventHandler(evt interface{}) {
 				// Ignore messages starting with BotPrefix
 				if len(msgText) >= len(BotPrefix) && msgText[:len(BotPrefix)] == BotPrefix {
 					fmt.Println("Ignoring bot message")
+					return
+				}
+
+				// Handle "LET IT BE" override for watcher-blocked messages
+				if msgText == "LET IT BE" {
+					if lastWithheldMessage != nil {
+						fmt.Println("[LET IT BE] Overriding watcher block - sending withheld message")
+						lastWithheldMessage.SendFunc(lastWithheldMessage.Message)
+						lastWithheldMessage = nil
+						// Send confirmation
+						if whatsAppClient != nil {
+							whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								Conversation: proto.String("[Blady][Watcher] : Message sent."),
+							})
+						}
+					} else {
+						fmt.Println("[LET IT BE] No withheld message to send")
+						if whatsAppClient != nil {
+							whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								Conversation: proto.String("[Blady][Watcher] : No blocked message to release."),
+							})
+						}
+					}
 					return
 				}
 
@@ -590,12 +623,13 @@ func main() {
 	// Initialize task bot with StartTaskCallback
 	// This callback is triggered when a task is confirmed via confirm_task action
 	// SendMasterFunc sends to self-chat (Note to Self) - uses closure over whatsAppClient
+	// Note: The bot itself adds [Blady][Task {ID}] or [Blady][Watcher] prefix as appropriate
 	sendMasterFromTask := func(msg string) {
 		if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
 			// Get own JID for self-chat
 			ownJID := whatsAppClient.Store.ID.ToNonAD()
 			_, err := whatsAppClient.SendMessage(context.Background(), ownJID, &waProto.Message{
-				Conversation: proto.String("[Task] : " + msg),
+				Conversation: proto.String(msg),
 			})
 			if err != nil {
 				fmt.Printf("Failed to send master message from task: %v\n", err)
@@ -603,6 +637,20 @@ func main() {
 		}
 	}
 	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client))
+
+	// Set up OnWatcherBlock callback to store withheld messages for LET IT BE override
+	taskBot.OnWatcherBlock = func(blockedMsg string, targetChatID string, sendFunc func(string)) {
+		lastWithheldMessage = &WithheldMessage{
+			Message:  blockedMsg,
+			SendFunc: sendFunc,
+		}
+		// Parse target JID to store for potential later use
+		if targetJID, err := types.ParseJID(targetChatID); err == nil {
+			lastWithheldMessage.TargetChatJID = targetJID
+		}
+		fmt.Printf("[Watcher] Stored withheld message for LET IT BE override: %s\n", blockedMsg)
+	}
+
 	taskBot.StartTaskCallback = func(task *tasks.Task) {
 		fmt.Printf("[TaskManager] Starting task %d for contact %s\n", task.ID, task.Contact)
 
