@@ -50,39 +50,43 @@ func NewTaskManager(tasksDir string) *TaskManager {
 	}
 }
 
-// getNextID scans existing task files and returns the next available ID
+// getNextID checks the last id in '_last_id' file in the tasks directory (stored as string).
+// If the file doesn't exist write 1, if it exists read, add 1, write and continue with the current value.
 func (tm *TaskManager) getNextID() (int, error) {
-	entries, err := os.ReadDir(tm.TasksDir)
+	lastIDPath := filepath.Join(tm.TasksDir, "_last_id")
+
+	// Ensure directory exists
+	if err := os.MkdirAll(tm.TasksDir, 0755); err != nil {
+		return 0, fmt.Errorf("failed to create tasks directory: %w", err)
+	}
+
+	data, err := os.ReadFile(lastIDPath)
 	if err != nil {
-		return 1, nil // If directory doesn't exist, start from 1
+		if os.IsNotExist(err) {
+			// If file doesn't exist, write "1" and return 1
+			if err := os.WriteFile(lastIDPath, []byte("1"), 0644); err != nil {
+				return 0, fmt.Errorf("failed to write initial _last_id: %w", err)
+			}
+			return 1, nil
+		}
+		return 0, fmt.Errorf("failed to read _last_id: %w", err)
 	}
 
-	maxID := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".json") {
-			continue
-		}
-		// Skip sample file
-		if name == "0_sample.json" {
-			continue
-		}
-
-		// Parse ID from filename (e.g., "1.json" -> 1)
-		idStr := strings.TrimSuffix(name, ".json")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			continue // Skip files that don't match pattern
-		}
-		if id > maxID {
-			maxID = id
-		}
+	// Read, increment, and write back
+	idStr := strings.TrimSpace(string(data))
+	lastID, err := strconv.Atoi(idStr)
+	if err != nil {
+		// Fallback: if file is corrupted, return error or try to recover?
+		// Given it's a "fix", let's return error to be safe.
+		return 0, fmt.Errorf("failed to parse _last_id '%s': %w", idStr, err)
 	}
 
-	return maxID + 1, nil
+	nextID := lastID + 1
+	if err := os.WriteFile(lastIDPath, []byte(strconv.Itoa(nextID)), 0644); err != nil {
+		return 0, fmt.Errorf("failed to update _last_id: %w", err)
+	}
+
+	return nextID, nil
 }
 
 // taskPath returns the file path for a given task ID
