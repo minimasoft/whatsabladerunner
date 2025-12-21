@@ -37,9 +37,6 @@ import (
 	"whatsabladerunner/workflows"
 )
 
-// LLMProvider removed constant in favor of dynamic config
-// const LLMProvider = "cerebras" //"ollama"
-
 var (
 	batataKernel   *batata.Kernel
 	llmClient      llm.Client

@@ -32,7 +32,6 @@ const (
 
 type Config struct {
 	Language       Language `json:"language"`
-	LLMProvider    string   `json:"llm_provider"` // "ollama", "cerebras", "none"
 	OllamaHost     string   `json:"ollama_host"`
 	OllamaPort     string   `json:"ollama_port"`
 	OllamaModel    string   `json:"ollama_model"`
@@ -57,9 +56,8 @@ func NewKernel(configDir string) *Kernel {
 		ConfigPath: filepath.Join(configDir, "batata.json"),
 		Config: Config{
 			Language:       LangEnglish, // Default fallack
-			LLMProvider:    "none",
 			BrainProvider:  "none",
-			TimeoutSeconds: 60,
+			TimeoutSeconds: 180,
 			OllamaHost:     "http://localhost",
 			OllamaPort:     "11434",
 			OllamaModel:    "qwen3:8b",
@@ -142,20 +140,17 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 	case StateSetupLLMChoice:
 		switch cleanMsg {
 		case "1":
-			k.Config.LLMProvider = "ollama"
 			k.Config.BrainProvider = "ollama"
 			k.State = StateSetupOllama
 			k.tempInputStep = 0
 			sendFunc(msg(k.s(func(s Strings) string { return s.OllamaHost })))
 		case "2":
-			k.Config.LLMProvider = "cerebras"
 			k.Config.BrainProvider = "cerebras"
 			k.State = StateSetupCerebras
 			k.tempInputStep = 0
 			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasConfig })))
 			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasKey })))
 		case "3":
-			k.Config.LLMProvider = "none"
 			k.Config.BrainProvider = "none"
 			k.finishConfig(sendFunc)
 		default:
