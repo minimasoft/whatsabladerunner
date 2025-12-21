@@ -754,9 +754,36 @@ func main() {
 		listStoredConversations(client)
 	}()
 
+	// Start Ticker
+	go startScheduledTasksTicker()
+
 	<-c
 
 	client.Disconnect()
+}
+
+func startScheduledTasksTicker() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	fmt.Println("Starting scheduled tasks ticker...")
+
+	for range ticker.C {
+		if taskBot != nil && taskBot.TaskManager != nil {
+			startedTasks, err := taskBot.TaskManager.CheckScheduledTasks()
+			if err != nil {
+				fmt.Printf("Error checking scheduled tasks: %v\n", err)
+				continue
+			}
+
+			for _, task := range startedTasks {
+				// Trigger start callback for each started task
+				if taskBot.StartTaskCallback != nil {
+					taskBot.StartTaskCallback(task)
+				}
+			}
+		}
+	}
 }
 
 func listStoredConversations(client *whatsmeow.Client) {

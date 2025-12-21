@@ -235,7 +235,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 				continue
 			}
 
-			task, err := b.TaskManager.CreateTask(taskContent.Objective, taskContent.Contact, taskContent.OriginalOrders)
+			task, err := b.TaskManager.CreateTask(taskContent.Objective, taskContent.Contact, taskContent.OriginalOrders, taskContent.ScheduleDatetime)
 			if err != nil {
 				fmt.Printf("Failed to create task: %v\n", err)
 				if b.SendFunc != nil {

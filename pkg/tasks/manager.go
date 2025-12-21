@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Task status constants
@@ -16,6 +17,7 @@ const (
 	StatusRunning     = "running"
 	StatusPaused      = "paused"
 	StatusFinished    = "finished"
+	StatusScheduled   = "scheduled"
 )
 
 // Task represents a task stored as a JSON file
@@ -27,13 +29,15 @@ type Task struct {
 	ChatID                 string `json:"chat_id,omitempty"` // Chat JID where task is active (may differ from Contact for bots)
 	Status                 string `json:"status"`
 	LastProcessedTimestamp int64  `json:"last_processed_timestamp,omitempty"` // Unix timestamp of last processed message
+	ScheduleDatetime       string `json:"schedule_datetime,omitempty"`        // ISO 8601 formatted string (YYYY-MM-DDTHH:MM)
 }
 
 // CreateTaskContent represents the content of a create_task action
 type CreateTaskContent struct {
-	Objective      string `json:"objective"`
-	Contact        string `json:"contact"`
-	OriginalOrders string `json:"original_orders"`
+	Objective        string `json:"objective"`
+	Contact          string `json:"contact"`
+	OriginalOrders   string `json:"original_orders"`
+	ScheduleDatetime string `json:"schedule_datetime,omitempty"`
 }
 
 // TaskManager handles all task file operations
@@ -178,18 +182,19 @@ func (tm *TaskManager) SaveTask(task *Task) error {
 }
 
 // CreateTask creates a new task with an auto-incremented ID and unconfirmed status
-func (tm *TaskManager) CreateTask(objective, contact, originalOrders string) (*Task, error) {
+func (tm *TaskManager) CreateTask(objective, contact, originalOrders, scheduleDatetime string) (*Task, error) {
 	nextID, err := tm.getNextID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next ID: %w", err)
 	}
 
 	task := &Task{
-		ID:             nextID,
-		Objective:      objective,
-		Contact:        contact,
-		OriginalOrders: originalOrders,
-		Status:         StatusUnconfirmed,
+		ID:               nextID,
+		Objective:        objective,
+		Contact:          contact,
+		OriginalOrders:   originalOrders,
+		Status:           StatusUnconfirmed,
+		ScheduleDatetime: scheduleDatetime,
 	}
 
 	if err := tm.SaveTask(task); err != nil {
@@ -232,7 +237,19 @@ func (tm *TaskManager) ConfirmTask(id int) error {
 		return fmt.Errorf("task %d is not unconfirmed (current status: %s)", id, task.Status)
 	}
 
-	task.Status = StatusPending
+	// Check if task is scheduled
+	if task.ScheduleDatetime != "" {
+		t, err := time.ParseInLocation("2006-01-02T15:04", task.ScheduleDatetime, time.Local)
+		if err == nil && t.After(time.Now()) {
+			task.Status = StatusScheduled
+			fmt.Printf("[TaskManager] Task %d scheduled for %s\n", id, task.ScheduleDatetime)
+		} else {
+			task.Status = StatusPending
+		}
+	} else {
+		task.Status = StatusPending
+	}
+
 	if err := tm.SaveTask(task); err != nil {
 		return err
 	}
@@ -355,7 +372,19 @@ func (tm *TaskManager) ConfirmTaskAndGet(id int) (*Task, error) {
 		return nil, fmt.Errorf("task %d is not unconfirmed (current status: %s)", id, task.Status)
 	}
 
-	task.Status = StatusPending
+	// Check if task is scheduled
+	if task.ScheduleDatetime != "" {
+		t, err := time.ParseInLocation("2006-01-02T15:04", task.ScheduleDatetime, time.Local)
+		if err == nil && t.After(time.Now()) {
+			task.Status = StatusScheduled
+			fmt.Printf("[TaskManager] Task %d scheduled for %s\n", id, task.ScheduleDatetime)
+		} else {
+			task.Status = StatusPending
+		}
+	} else {
+		task.Status = StatusPending
+	}
+
 	if err := tm.SaveTask(task); err != nil {
 		return nil, err
 	}
@@ -395,4 +424,55 @@ func (tm *TaskManager) SetTaskProcessedTimestamp(id int, timestamp int64) error 
 
 	// fmt.Printf("[TaskManager] Task %d processed timestamp updated to %d\n", id, timestamp)
 	return nil
+}
+
+// CheckScheduledTasks checks for scheduled tasks that are due to start
+// It transitions them to pending and returns the list of started tasks
+func (tm *TaskManager) CheckScheduledTasks() ([]*Task, error) {
+	entries, err := os.ReadDir(tm.TasksDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []*Task{}, nil
+		}
+		return nil, fmt.Errorf("failed to read tasks directory: %w", err)
+	}
+
+	var startedTasks []*Task
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".json") || name == "0_sample.json" {
+			continue
+		}
+
+		filePath := filepath.Join(tm.TasksDir, name)
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		var task Task
+		if err := json.Unmarshal(data, &task); err != nil {
+			continue
+		}
+
+		if task.Status == StatusScheduled && task.ScheduleDatetime != "" {
+			t, err := time.ParseInLocation("2006-01-02T15:04", task.ScheduleDatetime, time.Local)
+			// If parse error, or time has passed (or is now), start it.
+			if err != nil || !t.After(time.Now()) {
+				task.Status = StatusPending
+				if err := tm.SaveTask(&task); err != nil {
+					fmt.Printf("Failed to update scheduled task %d: %v\n", task.ID, err)
+					continue
+				}
+				fmt.Printf("[TaskManager] Scheduled task %d started (due: %s)\n", task.ID, task.ScheduleDatetime)
+				startedTasks = append(startedTasks, &task)
+			}
+		}
+	}
+
+	return startedTasks, nil
 }
