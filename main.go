@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"whatsabladerunner/pkg/agent"
+	"whatsabladerunner/pkg/batata"
 	"whatsabladerunner/pkg/bot"
 	"whatsabladerunner/pkg/buttons"
 	"whatsabladerunner/pkg/cerebras"
@@ -36,10 +37,11 @@ import (
 	"whatsabladerunner/workflows"
 )
 
-// LLMProvider selects which LLM provider to use: "ollama" or "cerebras"
-const LLMProvider = "cerebras" //"ollama"
+// LLMProvider removed constant in favor of dynamic config
+// const LLMProvider = "cerebras" //"ollama"
 
 var (
+	batataKernel   *batata.Kernel
 	llmClient      llm.Client
 	convManager    *agent.ConversationManager
 	whatsAppClient *whatsmeow.Client
@@ -201,6 +203,44 @@ func eventHandler(evt interface{}) {
 				fmt.Printf("DEBUG: Extracted text: %s\n", msgText)
 				// Start workflow in background, managed by ConversationManager
 				chatID := v.Info.Chat.String()
+
+				// BATATA INTERCEPTION
+				// Self-chat messages are passed to Batata first.
+				// We need a reply function.
+				replyFunc := func(msg string) {
+					if whatsAppClient != nil {
+						_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+							Conversation: proto.String(msg),
+						})
+						if err != nil {
+							fmt.Printf("Failed to send Batata message: %v\n", err)
+						}
+					}
+				}
+				killFunc := func() {
+					fmt.Println("Batata requested kill. Exiting...")
+					os.Exit(0)
+				}
+
+				if batataKernel.HandleMessage(msgText, v.Info.Sender, v.Info.Chat, replyFunc, killFunc) {
+					// Message handled by Batata, refresh LLM if config changed or just return
+					// Ideally we check if config changed, but for now we can just lazily reload or rely on explicit actions.
+					// If the user changed the brain, we should update the llmClient and taskBot.
+					// We can do this by checking if the state returned to Idle from a change state, or just re-init always on "Back to Blady".
+					// But HandleMessage returns true even for intermediate steps.
+					// Let's just return for now.
+					// If the user *just* finished config (HandleMessage returned true, but State went to Idle),
+					// we might want to ensure 'llmClient' is up to date for the next message.
+					// We can re-init LLM client here if needed?
+					// It's safer to re-init on demand or check a "Dirty" flag.
+					// For simplicity, we'll re-init LLM client if Batata is IDLE after handling (meaning it exited a menu).
+					if batataKernel.State == batata.StateIdle {
+						reinitLLM()
+					}
+					return
+				}
+
+				// Normal Note-to-Self Workflow
 				convManager.StartWorkflow(chatID, func(ctx context.Context) {
 					sendFunc := func(msg string) {
 						if whatsAppClient != nil {
@@ -519,20 +559,15 @@ func main() {
 	client := whatsAppClient
 
 	// Initialize LLM client based on provider selection
-	switch LLMProvider {
-	case "cerebras":
-		fmt.Println("Using Cerebras LLM provider")
-		var err error
-		llmClient, err = cerebras.NewClient("config/keys/cerebras.txt", "gpt-oss-120b")
-		if err != nil {
-			panic(fmt.Sprintf("Failed to initialize Cerebras client: %v", err))
-		}
-	case "ollama":
-		fallthrough
-	default:
-		fmt.Println("Using Ollama LLM provider")
-		llmClient = ollama.NewClient("http://localhost:11434", "qwen3:8b")
+	// Initialize Batata
+	batataKernel = batata.NewKernel("config")
+	if err := batataKernel.Load(); err != nil {
+		fmt.Println("No Batata config found (or error), starting in Setup Mode.")
+		// We will trigger setup after connection
 	}
+
+	// Initialize LLM client based on Batata Config
+	reinitLLM()
 	convManager = agent.NewConversationManager()
 	taskLocks = locks.New()
 	buttonManager = buttons.NewManager()
@@ -684,6 +719,34 @@ func main() {
 		}
 	}
 
+	// Post-Connect: Check if we need to start Batata Setup
+	// We need to wait a bit to ensure we can send messages?
+	// Or we can just fire it.
+	// To send to "Self", we need our own JID.
+	if client.Store.ID != nil {
+		selfJID := client.Store.ID.ToNonAD()
+		sendToSelf := func(msg string) {
+			client.SendMessage(context.Background(), selfJID, &waProto.Message{
+				Conversation: proto.String(msg),
+			})
+		}
+
+		// If config was missing, Load() returned error, but NewKernel gave defaults.
+		// We can check if file exists or simply if we want to force setup.
+		// Actually, Load() updates the config. If it failed, we are using defaults.
+		// We should explicitly know if we need setup.
+		// Let's retry Load to be sure, or track it.
+		// Actually, NewKernel doesn't run Load. We ran Load above.
+		// If Load failed, we assume we need setup.
+		if _, err := os.Stat(batataKernel.ConfigPath); os.IsNotExist(err) {
+			fmt.Println("Starting Batata Setup via WhatsApp...")
+			go func() {
+				time.Sleep(5 * time.Second) // Give time to connect fully
+				batataKernel.StartSetup(sendToSelf)
+			}()
+		}
+	}
+
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -817,9 +880,63 @@ func getAllContactsJSON(client *whatsmeow.Client) string {
 		}
 	}
 
-	data, err := json.Marshal(contacts)
-	if err != nil {
-		return "[]"
+	jsonData, _ := json.Marshal(contacts)
+	return string(jsonData)
+}
+
+func reinitLLM() {
+	cfg := batataKernel.Config
+	fmt.Printf("Re-initializing LLM. Provider: %s\n", cfg.BrainProvider)
+
+	switch cfg.BrainProvider {
+	case "cerebras":
+		var err error
+		key := cfg.CerebrasKey
+		if key == "" {
+			content, _ := os.ReadFile("config/keys/cerebras.txt")
+			key = strings.TrimSpace(string(content))
+		}
+		model := cfg.CerebrasModel
+		if model == "" {
+			model = "gpt-oss-120b"
+		}
+
+		llmClient, err = cerebras.NewClientWithKey(key, model)
+		if err != nil {
+			fmt.Printf("Failed to initialize Cerebras client: %v\n", err)
+			llmClient = nil // Or a no-op client
+		}
+	case "ollama":
+		host := cfg.OllamaHost
+		if host == "" {
+			host = "http://localhost"
+		}
+		port := cfg.OllamaPort
+		if port == "" {
+			port = "11434"
+		}
+		model := cfg.OllamaModel
+		if model == "" {
+			model = "qwen3:8b"
+		}
+		// Construct URL
+		url := host
+		if !strings.HasPrefix(url, "http") {
+			url = "http://" + url
+		}
+		fullURL := fmt.Sprintf("%s:%s", url, port)
+
+		llmClient = ollama.NewClient(fullURL, model)
+	case "none":
+		fmt.Println("LLM Provider is NONE.")
+		llmClient = nil
+	default:
+		// Default to none
+		llmClient = nil
 	}
-	return string(data)
+
+	// Update TaskBot if it exists
+	if taskBot != nil {
+		taskBot.Client = llmClient
+	}
 }

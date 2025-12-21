@@ -45,6 +45,24 @@ func NewClient(keyFilePath, model string) (*Client, error) {
 	}, nil
 }
 
+// NewClientWithKey creates a new Cerebras client with the provided API key.
+func NewClientWithKey(apiKey, model string) (*Client, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key is empty")
+	}
+
+	if model == "" {
+		model = "gpt-oss-120b"
+	}
+
+	return &Client{
+		APIKey:  apiKey,
+		Model:   model,
+		Client:  &http.Client{Timeout: 222 * time.Second},
+		BaseURL: "https://api.cerebras.ai/v1/chat/completions",
+	}, nil
+}
+
 // ChatRequest represents the request body for Cerebras API
 type ChatRequest struct {
 	Model           string        `json:"model"`
