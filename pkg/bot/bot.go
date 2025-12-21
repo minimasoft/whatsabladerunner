@@ -216,11 +216,14 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		case "create_task":
 			var taskContent tasks.CreateTaskContent
 			if err := json.Unmarshal(rawAction.Content, &taskContent); err != nil {
-				fmt.Printf("Failed to parse create_task content: %v\n", err)
-				if b.SendFunc != nil {
-					b.SendFunc("[Blady] : Error: No pude procesar la creación de tarea.")
+				// Try unmarshaling from contentStr in case it was a double-quoted JSON string
+				if err := json.Unmarshal([]byte(contentStr), &taskContent); err != nil {
+					fmt.Printf("Failed to parse create_task content: %v (Raw: %s)\n", err, string(rawAction.Content))
+					if b.SendFunc != nil {
+						b.SendFunc("[Blady] : Error: No pude procesar la creación de tarea.")
+					}
+					continue
 				}
-				continue
 			}
 
 			// Validate contact is in the contacts list
@@ -429,14 +432,17 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 			}
 
 		case "button_response":
-			// Parse button response content: {displayText, buttonID}
 			var btnResp struct {
 				DisplayText string `json:"displayText"`
 				ButtonID    string `json:"buttonID"`
 			}
 			if err := json.Unmarshal(rawAction.Content, &btnResp); err != nil {
-				fmt.Printf("Failed to parse button_response content: %v\n", err)
-				continue
+				// Try unmarshaling from contentStr in case it was a double-quoted JSON string
+				if err := json.Unmarshal([]byte(contentStr), &btnResp); err != nil {
+					// Fallback: treat as a simple string button response
+					btnResp.DisplayText = contentStr
+					btnResp.ButtonID = ""
+				}
 			}
 			if b.SendButtonResponseFunc != nil {
 				b.SendButtonResponseFunc(btnResp.DisplayText, btnResp.ButtonID)

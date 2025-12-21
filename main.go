@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/mdp/qrterminal/v3"
 
 	"go.mau.fi/whatsmeow"
-	waAdv "go.mau.fi/whatsmeow/proto/waAdv"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
@@ -28,6 +26,7 @@ import (
 
 	"whatsabladerunner/pkg/agent"
 	"whatsabladerunner/pkg/bot"
+	"whatsabladerunner/pkg/buttons"
 	"whatsabladerunner/pkg/cerebras"
 	"whatsabladerunner/pkg/history"
 	"whatsabladerunner/pkg/llm"
@@ -49,17 +48,8 @@ var (
 	taskLocks      *locks.KeyedMutex
 )
 
-// ButtonsContext stores the context needed for button responses
-type ButtonsContext struct {
-	MessageID string
-	ChatJID   types.JID // The origin chat (LID or Group or PN)
-	SenderJID types.JID // The actual sender (LID or PN)
-	SenderAlt types.JID // The alternative JID (PN if Sender is LID)
-	Message   *waProto.Message
-}
-
-// lastButtonsMessage stores the last buttons/list message per chat for context
-var lastButtonsMessage = make(map[string]*ButtonsContext)
+// buttonManager handles interactive message context and responses
+var buttonManager *buttons.Manager
 
 // WithheldMessage stores a blocked message for potential "LET IT BE" override
 type WithheldMessage struct {
@@ -72,57 +62,6 @@ type WithheldMessage struct {
 var lastWithheldMessage *WithheldMessage
 
 const BotPrefix = "[Blady] : "
-
-// Helper to strip metadata from quoted messages
-func getCleanQuotedMessage(orig *waProto.Message) *waProto.Message {
-	if orig == nil {
-		return nil
-	}
-	clean := &waProto.Message{}
-	// Copy only content fields, ignore transport metadata or context info wrapper
-	if orig.Conversation != nil {
-		clean.Conversation = orig.Conversation
-	}
-	if orig.ExtendedTextMessage != nil {
-		clean.ExtendedTextMessage = &waProto.ExtendedTextMessage{
-			Text: orig.ExtendedTextMessage.Text,
-			// Ignore ContextInfo, PreviewType, etc.
-		}
-	}
-	if orig.ButtonsMessage != nil {
-		// Deep copy ButtonsMessage content, EXCLUDING ContextInfo
-		bm := orig.ButtonsMessage
-		clean.ButtonsMessage = &waProto.ButtonsMessage{
-			ContentText: bm.ContentText,
-			FooterText:  bm.FooterText,
-			Buttons:     bm.Buttons, // Buttons themselves are simple structs usually
-			HeaderType:  bm.HeaderType,
-			// explicit: ContextInfo: nil
-		}
-		if bm.HeaderType != nil && *bm.HeaderType != waProto.ButtonsMessage_EMPTY {
-			// Copy header content if present (Text, Doc, Image etc)
-			// But for safety, maybe just text?
-			// The log showed headerType:EMPTY usually.
-			// If we need media headers, we'd copy them.
-		}
-	}
-	if orig.ListMessage != nil {
-		lm := orig.ListMessage
-		clean.ListMessage = &waProto.ListMessage{
-			Title:       lm.Title,
-			Description: lm.Description,
-			ButtonText:  lm.ButtonText,
-			ListType:    lm.ListType,
-			Sections:    lm.Sections,
-			FooterText:  lm.FooterText,
-			// explicit: ContextInfo: nil
-		}
-	}
-	// ... (other types simplified for now, focusing on text/buttons/list)
-
-	// Ensure MessageContextInfo is nil or empty to avoid 479 on re-send
-	return clean
-}
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -172,14 +111,13 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store buttons context for later response
-				// Store RAW JIDs to allow strategy testing
-				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+				buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
 					MessageID: v.Info.ID,
 					ChatJID:   v.Info.Chat,
 					SenderJID: v.Info.Sender,
 					SenderAlt: v.Info.MessageSource.SenderAlt,
 					Message:   v.Message,
-				}
+				})
 				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s sender=%s senderAlt=%s\n",
 					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
 			} else if v.Message.ListMessage != nil {
@@ -206,13 +144,13 @@ func eventHandler(evt interface{}) {
 					}
 				}
 				// Store list context for later response
-				lastButtonsMessage[v.Info.Chat.String()] = &ButtonsContext{
+				buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
 					MessageID: v.Info.ID,
 					ChatJID:   v.Info.Chat,
 					SenderJID: v.Info.Sender,
 					SenderAlt: v.Info.MessageSource.SenderAlt,
 					Message:   v.Message,
-				}
+				})
 				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s sender=%s senderAlt=%s\n",
 					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
 			}
@@ -447,81 +385,20 @@ func eventHandler(evt interface{}) {
 						// Setup button response for this execution
 						chatJIDForContext := v.Info.Chat.String()
 						taskBot.SendButtonResponseFunc = func(displayText, buttonID string) {
-							// ... (Reuse existing button logic by wrapping or extracting?
-							// The previous logic was closure-heavy. Let's duplicate or refactor.
-							// For safety and speed in this specific 'replace' block, I will copy the logic
-							// or better, define a shared helper if possible.
-							// But since I can't easily refactor outside this block without more edits,
-							// and the logic is complex (V4 mirror), I'll copy the core call back to the main client/logic.
-							// Actually, I can use the same logic as before, just inline it or ensure 'v' is available.
-							// 'v' IS available in the closure (eventHandler closure).
-							// So I can just copy the inner function body.
-
 							if whatsAppClient != nil {
-								// Get stored buttons context
-								btnCtx := lastButtonsMessage[chatJIDForContext]
-								if btnCtx == nil {
-									fmt.Printf("[ButtonResponse] No buttons context found for chat %s, falling back to text\n", chatJIDForContext)
-									whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
-									return
-								}
-								// ... Full V4 Mirror Logic ...
-								// To avoid huge code duplication risk in this diff, I will simplify or rely on the fact
-								// that I can't easily copy 100 lines here.
-								// Wait, the previous block I'm replacing HAD the V4 logic.
-								// I should check if I can keep it.
-								// I can't call the previous 'sendButtonResponse' because it was defined inside the 'convManager.StartWorkflow' block which I am removing.
-								// So I MUST redefine it or extract it.
-								// Given the 'replace' limit, I'll define it here.
-
-								// Re-implementing V4 Minimal for brevity in this block, assuming similar context
-								// Actually, I should probably copy the logic exactly to ensure stability.
-								// It is verbose but safe.
-
-								cleanQuote := getCleanQuotedMessage(btnCtx.Message)
-								cleanQuote.MessageContextInfo = &waProto.MessageContextInfo{}
-								var hash []byte
-								var ts uint64 = uint64(time.Now().Unix())
-								if btnCtx.Message.MessageContextInfo != nil && btnCtx.Message.MessageContextInfo.DeviceListMetadata != nil {
-									hash = btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientKeyHash
-									if btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp != nil {
-										ts = *btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp
+								if buttonID == "" {
+									if rd, rb, found := buttonManager.Resolve(chatJIDForContext, displayText); found {
+										displayText = rd
+										buttonID = rb
 									}
 								}
-								partPN := btnCtx.SenderAlt.ToNonAD().String()
-								if btnCtx.SenderAlt.IsEmpty() {
-									partPN = btnCtx.SenderJID.ToNonAD().String()
-								}
-								target := btnCtx.ChatJID
-								protoMsg := &waProto.Message{
-									Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"),
-									MessageContextInfo: &waProto.MessageContextInfo{
-										DeviceListMetadataVersion: proto.Int32(2),
-										DeviceListMetadata: &waProto.DeviceListMetadata{
-											SenderKeyHash: hash, SenderTimestamp: proto.Uint64(ts),
-											SenderAccountType:   waAdv.ADVEncryptionType_E2EE.Enum(),
-											ReceiverAccountType: waAdv.ADVEncryptionType_E2EE.Enum(),
-										},
-									},
-									ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
-										SelectedButtonID: proto.String(buttonID),
-										Response:         &waProto.ButtonsResponseMessage_SelectedDisplayText{SelectedDisplayText: displayText},
-										ContextInfo: &waProto.ContextInfo{
-											StanzaID: proto.String(btnCtx.MessageID), Participant: proto.String(partPN), QuotedMessage: cleanQuote,
-										},
-										Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
-									},
-								}
-
-								// Send
-								_, err := whatsAppClient.SendMessage(context.Background(), target, protoMsg)
+								msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatJIDForContext, displayText, buttonID)
 								if err != nil {
-									// Fallback retry
-									if target.String() != btnCtx.SenderAlt.String() && !btnCtx.SenderAlt.IsEmpty() {
-										whatsAppClient.SendMessage(context.Background(), btnCtx.SenderAlt, protoMsg)
-									}
+									fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
+									whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
+								} else {
+									historyStore.SaveMessage(msgID, cJID, "Me", displayText, time.Now(), true)
 								}
-								historyStore.SaveMessage("btn-resp", cJID, "Me", displayText, time.Now(), true)
 							}
 						}
 
@@ -658,6 +535,7 @@ func main() {
 	}
 	convManager = agent.NewConversationManager()
 	taskLocks = locks.New()
+	buttonManager = buttons.NewManager()
 
 	historyStore, err = history.New("history.db")
 	if err != nil {
@@ -739,88 +617,18 @@ func main() {
 		contactChatID := task.Contact
 		sendButtonResponse := func(displayText, buttonID string) {
 			if whatsAppClient != nil {
-				// Get stored buttons context
-				btnCtx := lastButtonsMessage[contactChatID]
-				if btnCtx == nil {
-					fmt.Printf("[ButtonResponse] No buttons context found for chat %s, falling back to text\n", contactChatID)
-					// Fallback to regular text response
-					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
-						Conversation: proto.String(displayText),
-					})
-					return
-				}
-
-				fmt.Printf("[ButtonResponse] Sending: displayText=%s, buttonID=%s, stanzaID=%s\n",
-					displayText, buttonID, btnCtx.MessageID)
-
-				// Final Strategy: Full Mirror (V4)
-				cleanQuote := getCleanQuotedMessage(btnCtx.Message)
-				cleanQuote.MessageContextInfo = &waProto.MessageContextInfo{}
-
-				var hash []byte
-				var ts uint64 = uint64(time.Now().Unix())
-				if btnCtx.Message.MessageContextInfo != nil && btnCtx.Message.MessageContextInfo.DeviceListMetadata != nil {
-					hash = btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientKeyHash
-					if btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp != nil {
-						ts = *btnCtx.Message.MessageContextInfo.DeviceListMetadata.RecipientTimestamp
+				if buttonID == "" {
+					if rd, rb, found := buttonManager.Resolve(contactChatID, displayText); found {
+						displayText = rd
+						buttonID = rb
 					}
 				}
-
-				partPN := btnCtx.SenderAlt.ToNonAD().String()
-				if btnCtx.SenderAlt.IsEmpty() {
-					partPN = btnCtx.SenderJID.ToNonAD().String()
-				}
-
-				target := btnCtx.ChatJID
-
-				protoMsg := &waProto.Message{
-					Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"),
-					MessageContextInfo: &waProto.MessageContextInfo{
-						DeviceListMetadataVersion: proto.Int32(2),
-						DeviceListMetadata: &waProto.DeviceListMetadata{
-							SenderKeyHash:       hash,
-							SenderTimestamp:     proto.Uint64(ts),
-							SenderAccountType:   waAdv.ADVEncryptionType_E2EE.Enum(),
-							ReceiverAccountType: waAdv.ADVEncryptionType_E2EE.Enum(),
-						},
-					},
-					ButtonsResponseMessage: &waProto.ButtonsResponseMessage{
-						SelectedButtonID: proto.String(buttonID),
-						Response: &waProto.ButtonsResponseMessage_SelectedDisplayText{
-							SelectedDisplayText: displayText,
-						},
-						ContextInfo: &waProto.ContextInfo{
-							StanzaID:      proto.String(btnCtx.MessageID),
-							Participant:   proto.String(partPN),
-							QuotedMessage: cleanQuote,
-						},
-						Type: waProto.ButtonsResponseMessage_DISPLAY_TEXT.Enum(),
-					},
-				}
-
-				marshaled, _ := proto.Marshal(protoMsg)
-				fmt.Printf("[ButtonResponse] Proto Base64 Mirror V4 (Task): %s\n", base64.StdEncoding.EncodeToString(marshaled))
-
-				fmt.Printf("[ButtonResponse] Sending Mirror Response (V4 Task): Dest=%s, Part=%s, StanzaID=%s\n",
-					target, partPN, btnCtx.MessageID)
-
-				resp, err := whatsAppClient.SendMessage(context.Background(), target, protoMsg)
+				msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, contactChatID, displayText, buttonID)
 				if err != nil {
-					fmt.Printf("[ButtonResponse] Failed (Task) with Dest=%s: %v\n", target, err)
-					if target.String() != btnCtx.SenderAlt.String() && !btnCtx.SenderAlt.IsEmpty() {
-						targetPN := btnCtx.SenderAlt
-						fmt.Printf("[ButtonResponse] Retry (Task) with Dest=PN: %s\n", targetPN)
-						resp, err = whatsAppClient.SendMessage(context.Background(), targetPN, protoMsg)
-						if err == nil {
-							fmt.Printf("[ButtonResponse] Success (Task) with Dest=PN! ID: %s\n", resp.ID)
-							historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
-						} else {
-							fmt.Printf("[ButtonResponse] Failed (Task) with Dest=PN: %v\n", err)
-						}
-					}
+					fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
+					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{Conversation: proto.String(displayText)})
 				} else {
-					fmt.Printf("[ButtonResponse] Success (Task)! ID: %s\n", resp.ID)
-					historyStore.SaveMessage(resp.ID, task.Contact, "Me", displayText, time.Now(), true)
+					historyStore.SaveMessage(msgID, task.Contact, "Me", displayText, time.Now(), true)
 				}
 			}
 		}
