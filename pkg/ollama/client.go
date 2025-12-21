@@ -16,6 +16,7 @@ type Client struct {
 	Model          string
 	Client         *http.Client
 	DefaultOptions map[string]interface{}
+	ErrorHandler   func(error)
 }
 
 func NewClient(baseURL, model string) *Client {
@@ -100,5 +101,9 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 		time.Sleep(2 * time.Second)
 	}
 
-	return nil, fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
+	finalErr := fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
+	if c.ErrorHandler != nil {
+		c.ErrorHandler(finalErr)
+	}
+	return nil, finalErr
 }

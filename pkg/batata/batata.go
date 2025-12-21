@@ -2,6 +2,7 @@ package batata
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -292,4 +293,12 @@ func (k *Kernel) finishConfig(sendFunc func(string)) {
 	sendFunc(msg(k.s(func(s Strings) string { return s.ConfigSaved })))
 	sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
 	k.State = StateIdle
+}
+
+func (k *Kernel) ReportLLMError(err error, sendFunc func(string)) {
+	errMsg := fmt.Sprintf(k.s(func(s Strings) string { return s.BrainError }), err.Error())
+	suggestion := k.s(func(s Strings) string { return s.BrainErrorSuggest })
+
+	sendFunc(msg(errMsg))
+	sendFunc(msg(suggestion))
 }

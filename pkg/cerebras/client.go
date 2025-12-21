@@ -14,10 +14,11 @@ import (
 )
 
 type Client struct {
-	APIKey  string
-	Model   string
-	Client  *http.Client
-	BaseURL string
+	APIKey       string
+	Model        string
+	Client       *http.Client
+	BaseURL      string
+	ErrorHandler func(error)
 }
 
 // NewClient creates a new Cerebras client.
@@ -65,13 +66,13 @@ func NewClientWithKey(apiKey, model string) (*Client, error) {
 
 // ChatRequest represents the request body for Cerebras API
 type ChatRequest struct {
-	Model           string        `json:"model"`
-	Messages        []llm.Message `json:"messages"`
-	Stream          bool          `json:"stream"`
-	MaxTokens       int           `json:"max_tokens"`
-	Temperature     float64       `json:"temperature"`
-	TopP            float64       `json:"top_p"`
-	ReasoningEffort string        `json:"reasoning_effort"`
+	Model       string        `json:"model"`
+	Messages    []llm.Message `json:"messages"`
+	Stream      bool          `json:"stream"`
+	MaxTokens   int           `json:"max_tokens"`
+	Temperature float64       `json:"temperature"`
+	TopP        float64       `json:"top_p"`
+	//ReasoningEffort string        `json:"reasoning_effort"`
 }
 
 // ChatResponse represents the response from Cerebras API
@@ -99,13 +100,13 @@ type ChatResponse struct {
 func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*llm.Message, error) {
 	// Build request with defaults
 	reqBody := ChatRequest{
-		Model:           c.Model,
-		Messages:        messages,
-		Stream:          false,
-		MaxTokens:       32768,
-		Temperature:     0.2,
-		TopP:            0.95,
-		ReasoningEffort: "medium",
+		Model:       c.Model,
+		Messages:    messages,
+		Stream:      false,
+		MaxTokens:   32768,
+		Temperature: 0.2,
+		TopP:        0.99,
+		//		ReasoningEffort: "medium",
 	}
 
 	// Allow options to override defaults
@@ -119,9 +120,9 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 		if v, ok := options["top_p"].(float64); ok {
 			reqBody.TopP = v
 		}
-		if v, ok := options["reasoning_effort"].(string); ok {
-			reqBody.ReasoningEffort = v
-		}
+		//if v, ok := options["reasoning_effort"].(string); ok {
+		//	reqBody.ReasoningEffort = v
+		//}
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -186,5 +187,9 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 		}
 	}
 
-	return nil, fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
+	finalErr := fmt.Errorf("failed after 3 attempts. Last error: %w", lastErr)
+	if c.ErrorHandler != nil {
+		c.ErrorHandler(finalErr)
+	}
+	return nil, finalErr
 }

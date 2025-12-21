@@ -887,6 +887,20 @@ func reinitLLM(notifyJID types.JID) {
 
 	var providerName, modelName string
 
+	// Define Error Handler
+	errorHandler := func(err error) {
+		fmt.Printf("LLM Error Handler triggered: %v\n", err)
+		batataKernel.ReportLLMError(err, func(msg string) {
+			// Send to Self (User)
+			if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+				selfJID := whatsAppClient.Store.ID.ToNonAD()
+				whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
+					Conversation: proto.String(msg),
+				})
+			}
+		})
+	}
+
 	switch cfg.BrainProvider {
 	case "cerebras":
 		var err error
@@ -902,10 +916,13 @@ func reinitLLM(notifyJID types.JID) {
 		providerName = "Cerebras"
 		modelName = model
 
-		llmClient, err = cerebras.NewClientWithKey(key, model)
+		client, err := cerebras.NewClientWithKey(key, model)
 		if err != nil {
 			fmt.Printf("Failed to initialize Cerebras client: %v\n", err)
 			llmClient = nil // Or a no-op client
+		} else {
+			client.ErrorHandler = errorHandler
+			llmClient = client
 		}
 	case "ollama":
 		host := cfg.OllamaHost
@@ -930,7 +947,9 @@ func reinitLLM(notifyJID types.JID) {
 		}
 		fullURL := fmt.Sprintf("%s:%s", url, port)
 
-		llmClient = ollama.NewClient(fullURL, model)
+		client := ollama.NewClient(fullURL, model)
+		client.ErrorHandler = errorHandler
+		llmClient = client
 	case "none":
 		fmt.Println("LLM Provider is NONE.")
 		llmClient = nil
