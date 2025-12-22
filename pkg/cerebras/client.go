@@ -159,10 +159,12 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 			}
 
 			fmt.Printf("[Cerebras] Success! Response received (length: %d chars).\n", len(chatResp.Choices[0].Message.Content))
-			return &llm.Message{
+			res := &llm.Message{
 				Role:    chatResp.Choices[0].Message.Role,
 				Content: chatResp.Choices[0].Message.Content,
-			}, nil
+			}
+			llm.LogLLM("cerebras", messages, res)
+			return res, nil
 		}
 
 		if resp != nil {
@@ -191,5 +193,6 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 	if c.ErrorHandler != nil {
 		c.ErrorHandler(finalErr)
 	}
+	llm.LogLLM("cerebras", messages, nil)
 	return nil, finalErr
 }

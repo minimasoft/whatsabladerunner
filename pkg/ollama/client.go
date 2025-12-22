@@ -88,6 +88,7 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 			}
 
 			fmt.Printf("[Ollama] Success! Response received (length: %d chars).\n", len(chatResp.Message.Content))
+			llm.LogLLM("ollama", messages, &chatResp.Message)
 			return &chatResp.Message, nil
 		}
 
@@ -105,5 +106,6 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 	if c.ErrorHandler != nil {
 		c.ErrorHandler(finalErr)
 	}
+	llm.LogLLM("ollama", messages, nil)
 	return nil, finalErr
 }
