@@ -28,6 +28,7 @@ import (
 	"whatsabladerunner/pkg/agent"
 	"whatsabladerunner/pkg/batata"
 	"whatsabladerunner/pkg/bot"
+	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/buttons"
 	"whatsabladerunner/pkg/cerebras"
 	"whatsabladerunner/pkg/history"
@@ -708,6 +709,9 @@ func main() {
 	}
 	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client))
 	taskBot.SendMediaFunc = sendMedia
+	taskBot.ActionRegistry.Register(&actions.SearchContactsAction{
+		SearchFunc: searchContacts,
+	})
 
 	// Set up OnWatcherBlock callback to store withheld messages for LET IT BE override
 	taskBot.OnWatcherBlock = func(blockedMsg string, targetChatID string, sendFunc func(string)) {
@@ -1100,6 +1104,63 @@ func getAllContactsJSON(client *whatsmeow.Client) string {
 
 	jsonData, _ := json.Marshal(contacts)
 	return string(jsonData)
+}
+
+func searchContacts(query string) string {
+	if whatsAppClient == nil || whatsAppClient.Store == nil || whatsAppClient.Store.Contacts == nil {
+		return "Error: Contacts store not available."
+	}
+
+	queryLower := strings.ToLower(query)
+	results := []string{}
+
+	// Helper to check match
+	matches := func(s string) bool {
+		return strings.Contains(strings.ToLower(s), queryLower)
+	}
+
+	// 1. Search Contacts
+	allContacts, err := whatsAppClient.Store.Contacts.GetAllContacts(context.Background())
+	if err == nil {
+		for jid, info := range allContacts {
+			if matches(info.PushName) || matches(info.FullName) || matches(info.BusinessName) || matches(jid.User) {
+				name := info.FullName
+				if name == "" {
+					name = info.PushName
+				}
+				if name == "" {
+					name = info.BusinessName
+				}
+				if name == "" {
+					name = "Unknown"
+				}
+				results = append(results, fmt.Sprintf("- Name: %s | JID: %s", name, jid.ToNonAD().String()))
+			}
+		}
+	}
+
+	// 2. Search Groups
+	groups, err := whatsAppClient.GetJoinedGroups(context.Background())
+	if err == nil {
+		for _, g := range groups {
+			if matches(g.Name) || matches(g.Topic) {
+				results = append(results, fmt.Sprintf("- Group: %s | JID: %s", g.Name, g.JID.String()))
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return "No contacts found matching '" + query + "'."
+	}
+
+	// Limit to 25
+	count := len(results)
+	if count > 25 {
+		results = results[:25]
+		results = append(results, fmt.Sprintf("... and %d more.", count-25))
+	}
+
+	return strings.Join(results, "\n")
 }
 
 func reinitLLM(notifyJID types.JID) {

@@ -19,6 +19,7 @@ type ActionContext struct {
 	Context       []string
 	Task          *tasks.Task // nil if not in task mode
 	SendToContact func(string)
+	ToolOutputs   *[]string // New: For returning tool results to the loop
 }
 
 // Action represents an executable action

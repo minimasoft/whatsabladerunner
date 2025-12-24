@@ -31,4 +31,4 @@ Using **local LLMs** (via Ollama):
 - **Configuration**: Your API keys and settings in `config/` are **NOT encrypted**.
 - **Media Storage**: Any media downloaded to `plain_media/` is stored as **plain files**.
 
-**Taking care of your local filesystem security is YOUR responsibility.** If someone has access to your machine, they have access to your Bladerunner's soul.
+**Taking care of your local filesystem security is YOUR responsibility.** If someone has access to your machine, they have access to Blady's soul (and will be able to impersonate you in whatsapp, read all your messages, etc.)

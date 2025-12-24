@@ -268,44 +268,81 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	botResp := &BotResponse{}
 
 	// 6. Execute Actions
-	for i, rawAction := range rawResp.Actions {
-		fmt.Printf("[Bot] Processing action %d: type=%s\n", i+1, rawAction.Type)
+	// Loop for tool use recursion
+	maxRecursion := 5
+	recursionDepth := 0
+	currentMsg := msg
 
-		act, ok := b.ActionRegistry.Get(rawAction.Type)
-		if !ok {
-			fmt.Printf("Warning: received unknown action '%s'\n", rawAction.Type)
+	for {
+		// Calculate recursion depth
+		if recursionDepth > maxRecursion {
+			fmt.Println("Warning: Max recursion depth reached in Process")
+			break
+		}
+
+		// Update message in modeData if recursion happened
+		if recursionDepth > 0 {
+			// Update the Mode Prompt with the new combined message
+			modeData.Message = currentMsg
+			modePrompt, err = b.PromptManager.LoadModePrompt(mode, modeData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to reload mode prompt: %w", err)
+			}
+			msgs[1].Content = modePrompt
+
+			// Re-run Chat
+			respMsg, err = b.Client.Chat(msgs, map[string]interface{}{"log_tag": "mode-" + mode})
+			if err != nil {
+				return nil, fmt.Errorf("ollama chat failed in recursion: %w", err)
+			}
+			content = cleanJSON(respMsg.Content)
+			if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
+				fmt.Printf("Raw response: %s\n", respMsg.Content)
+				return nil, fmt.Errorf("failed to parse bot response json: %w", err)
+			}
+		}
+
+		toolOutputs := []string{}
+
+		for i, rawAction := range rawResp.Actions {
+			fmt.Printf("[Bot] Processing action %d: type=%s\n", i+1, rawAction.Type)
+
+			act, ok := b.ActionRegistry.Get(rawAction.Type)
+			if !ok {
+				fmt.Printf("Warning: received unknown action '%s'\n", rawAction.Type)
+				continue
+			}
+
+			ctx := actions.ActionContext{
+				Context:     context,
+				ToolOutputs: &toolOutputs,
+			}
+
+			if err := act.Execute(ctx, rawAction.Content); err != nil {
+				fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
+			}
+
+			// Parse content to string
+			var contentStr string
+			if rawAction.Content != nil {
+				if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
+					contentStr = string(rawAction.Content)
+				}
+			}
+			botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
+		}
+
+		// Check if we have tool outputs to feed back
+		if len(toolOutputs) > 0 {
+			recursionDepth++
+			combinedOutputs := strings.Join(toolOutputs, "\n")
+			currentMsg = fmt.Sprintf("%s\n\n[System: Tool Results]\n%s", currentMsg, combinedOutputs)
+			fmt.Printf("[Bot] Tool outputs received, recursing (depth %d)...\n", recursionDepth)
 			continue
 		}
 
-		ctx := actions.ActionContext{
-			Context: context,
-		}
-
-		if err := act.Execute(ctx, rawAction.Content); err != nil {
-			fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
-			if b.SendFunc != nil {
-				// Inform user about internal error?
-				// b.SendFunc(fmt.Sprintf("[Blady] : Internal error executing action %s: %v", rawAction.Type, err))
-			}
-		}
-
-		// Backward compatibility: Populate BotResponse.Actions strings
-		// Some callers might act on BotResponse (main.go doesn't seem to use actions from response,
-		// it uses SendFunc etc. side effects).
-		// BotResponse struct is effectively just logging or unused return?
-		// Checking main.go usage of Process result:
-		// _, err := taskBot.Process(...)
-		// It ignores the returned *BotResponse (except for error).
-		// So we strictly rely on side effects.
-
-		// Parse content to string for legacy logging/compatibility in BotResponse
-		var contentStr string
-		if rawAction.Content != nil {
-			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
-				contentStr = string(rawAction.Content)
-			}
-		}
-		botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
+		// No tool outputs, we are done
+		break
 	}
 
 	return botResp, nil
@@ -376,32 +413,78 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	botResp := &BotResponse{}
 
 	// 7. Execute Actions
-	for i, rawAction := range rawResp.Actions {
-		fmt.Printf("[Bot/Task] Processing action %d: type=%s\n", i+1, rawAction.Type)
+	// Loop for tool use recursion
+	maxRecursion := 5
+	recursionDepth := 0
+	currentMsg := msg
 
-		act, ok := b.ActionRegistry.Get(rawAction.Type)
-		if !ok {
-			fmt.Printf("Warning: received unknown action '%s' in task mode\n", rawAction.Type)
+	for {
+		// Calculate recursion depth
+		if recursionDepth > maxRecursion {
+			fmt.Println("Warning: Max recursion depth reached in ProcessTask")
+			break
+		}
+
+		// Update message in modeData if recursion happened
+		if recursionDepth > 0 {
+			modeData.Message = currentMsg
+			modePrompt, err = b.PromptManager.LoadModePrompt("task", modeData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to reload task mode prompt: %w", err)
+			}
+			msgs[1].Content = modePrompt
+
+			respMsg, err = b.Client.Chat(msgs, map[string]interface{}{"log_tag": "task"})
+			if err != nil {
+				return nil, fmt.Errorf("ollama chat failed in recursion: %w", err)
+			}
+			content = cleanJSON(respMsg.Content)
+			if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
+				fmt.Printf("Raw response: %s\n", respMsg.Content)
+				return nil, fmt.Errorf("failed to parse bot response json: %w", err)
+			}
+		}
+
+		toolOutputs := []string{}
+
+		for i, rawAction := range rawResp.Actions {
+			fmt.Printf("[Bot/Task] Processing action %d: type=%s\n", i+1, rawAction.Type)
+
+			act, ok := b.ActionRegistry.Get(rawAction.Type)
+			if !ok {
+				fmt.Printf("Warning: received unknown action '%s' in task mode\n", rawAction.Type)
+				continue
+			}
+
+			ctx := actions.ActionContext{
+				Context:       context,
+				Task:          task,
+				SendToContact: sendToContact,
+				ToolOutputs:   &toolOutputs,
+			}
+
+			if err := act.Execute(ctx, rawAction.Content); err != nil {
+				fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
+			}
+
+			var contentStr string
+			if rawAction.Content != nil {
+				if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
+					contentStr = string(rawAction.Content)
+				}
+			}
+			botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
+		}
+
+		if len(toolOutputs) > 0 {
+			recursionDepth++
+			combinedOutputs := strings.Join(toolOutputs, "\n")
+			currentMsg = fmt.Sprintf("%s\n\n[System: Tool Results]\n%s", currentMsg, combinedOutputs)
+			fmt.Printf("[Bot/Task] Tool outputs received, recursing (depth %d)...\n", recursionDepth)
 			continue
 		}
 
-		ctx := actions.ActionContext{
-			Context:       context,
-			Task:          task,
-			SendToContact: sendToContact,
-		}
-
-		if err := act.Execute(ctx, rawAction.Content); err != nil {
-			fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
-		}
-
-		var contentStr string
-		if rawAction.Content != nil {
-			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
-				contentStr = string(rawAction.Content)
-			}
-		}
-		botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
+		break
 	}
 
 	return botResp, nil
