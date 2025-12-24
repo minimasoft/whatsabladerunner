@@ -25,6 +25,7 @@ type Bot struct {
 	SendMediaFunc          func(chatJID string, mediaID int64) // For sending media back
 	Contacts               string                              // JSON formatted string of contacts
 	StartTaskCallback      func(*tasks.Task)                   // Called when a task is confirmed to start it
+	ResumeTaskCallback     func(*tasks.Task)                   // Called when a task is resumed
 
 	// OnWatcherBlock is called when watcher blocks a message, allowing the caller to store it for potential override
 	OnWatcherBlock func(blockedMsg string, targetChatJID string, sendFunc func(string))
@@ -93,6 +94,11 @@ func (b *Bot) registerActions() {
 			StartTaskCallback: func(task *tasks.Task) {
 				if b.StartTaskCallback != nil {
 					b.StartTaskCallback(task)
+				}
+			},
+			ResumeTaskCallback: func(task *tasks.Task) {
+				if b.ResumeTaskCallback != nil {
+					b.ResumeTaskCallback(task)
 				}
 			},
 		})

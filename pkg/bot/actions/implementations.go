@@ -239,9 +239,10 @@ const (
 )
 
 type TaskManagementAction struct {
-	Type              TaskActionType
-	TaskManager       *tasks.TaskManager
-	StartTaskCallback func(*tasks.Task) // For confirm_task
+	Type               TaskActionType
+	TaskManager        *tasks.TaskManager
+	StartTaskCallback  func(*tasks.Task) // For confirm_task
+	ResumeTaskCallback func(*tasks.Task) // For resume_task
 }
 
 func (a *TaskManagementAction) GetSchema() ActionSchema {
@@ -295,7 +296,16 @@ func (a *TaskManagementAction) Execute(ctx ActionContext, payload json.RawMessag
 	case TaskPause:
 		return a.TaskManager.PauseTask(id)
 	case TaskResume:
-		return a.TaskManager.ResumeTask(id)
+		if err := a.TaskManager.ResumeTask(id); err != nil {
+			return err
+		}
+		if a.ResumeTaskCallback != nil {
+			task, err := a.TaskManager.LoadTask(id)
+			if err == nil {
+				a.ResumeTaskCallback(task)
+			}
+		}
+		return nil
 	}
 	return nil
 }

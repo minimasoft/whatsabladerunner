@@ -796,6 +796,98 @@ func main() {
 		}()
 	}
 
+	taskBot.ResumeTaskCallback = func(task *tasks.Task) {
+		fmt.Printf("[TaskManager] Resuming task %d for contact %s\n", task.ID, task.Contact)
+
+		// Parse contact JID
+		contactJID, err := types.ParseJID(task.Contact)
+		if err != nil {
+			fmt.Printf("Failed to parse contact JID %s: %v\n", task.Contact, err)
+			return
+		}
+
+		chatID := task.Contact
+		if task.ChatID != "" {
+			chatID = task.ChatID
+		}
+
+		// Create send function
+		sendToContact := func(msg string) {
+			if whatsAppClient != nil {
+				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+					Conversation: proto.String(msg),
+				})
+				if err != nil {
+					fmt.Printf("Failed to send task message: %v\n", err)
+				} else {
+					if err := historyStore.SaveMessage(resp.ID, chatID, "Me", msg, time.Now(), true); err != nil {
+						fmt.Printf("Failed to save task response to history: %v\n", err)
+					}
+				}
+			}
+		}
+
+		// Create button response function
+		sendButtonResponse := func(displayText, buttonID string) {
+			if whatsAppClient != nil {
+				if buttonID == "" {
+					if rd, rb, found := buttonManager.Resolve(chatID, displayText); found {
+						displayText = rd
+						buttonID = rb
+					}
+				}
+				msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatID, displayText, buttonID)
+				if err != nil {
+					fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
+					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{Conversation: proto.String(displayText)})
+				} else {
+					historyStore.SaveMessage(msgID, chatID, "Me", displayText, time.Now(), true)
+				}
+			}
+		}
+
+		go func(tID int, cJID string) {
+			// Lock task
+			lockKey := fmt.Sprintf("task:%d", tID)
+			taskLocks.Lock(lockKey)
+			defer taskLocks.Unlock(lockKey)
+
+			// Reload Task
+			currentTask, err := taskBot.TaskManager.LoadTask(tID)
+			if err != nil {
+				fmt.Printf("Failed to reload task %d: %v\n", tID, err)
+				return
+			}
+
+			// Fetch pending messages
+			newMsgs, maxUnix, err := historyStore.GetMessagesSince(cJID, currentTask.LastProcessedTimestamp)
+			if err != nil {
+				fmt.Printf("Failed to get pending messages for task %d: %v\n", tID, err)
+				return
+			}
+
+			combinedMsg := strings.Join(newMsgs, "\n")
+			if combinedMsg != "" {
+				combinedMsg += "\n"
+			}
+			combinedMsg += "[task resumed]"
+
+			fmt.Printf("Task %d: Resumed with %d new messages and trigger marker.\n", tID, len(newMsgs))
+
+			// Process
+			taskBot.SendButtonResponseFunc = sendButtonResponse
+			_, err = taskBot.ProcessTask(currentTask, combinedMsg, []string{}, sendToContact)
+			if err != nil {
+				fmt.Printf("Task resumption processing failed: %v\n", err)
+			}
+
+			// Update timestamp
+			if err := taskBot.TaskManager.SetTaskProcessedTimestamp(tID, maxUnix); err != nil {
+				fmt.Printf("Failed to update task timestamp: %v\n", err)
+			}
+		}(task.ID, chatID)
+	}
+
 	client.AddEventHandler(eventHandler)
 
 	// Configure Identification
