@@ -1,6 +1,6 @@
 # Installation Guide
 
-Welcome to **WhatsABladeRunner**! This guide will help you build and install the project on your system.
+Welcome to **whatsabladerunner**! This guide will help you build and install the project on your system. Once installed **whatsabladerunner supports 15 languages, sadly this instructions are only in English for now.
 
 ## Prerequisites
 
@@ -65,6 +65,3 @@ The first time you run **whatsabladerunner**, you must link it to your WhatsApp 
 2. **Link Device**: On your phone, open WhatsApp > Settings > Linked Devices > Link a Device.
 3. **Scan**: Scan the terminal QR code with your phone.
 4. **Device Info**: Once linked, it will appear in your WhatsApp settings as **Google Chrome** on **Windows**. This is normal behavior for the library being used.
-
----
-*Happy Vibes!*
