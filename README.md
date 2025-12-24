@@ -8,7 +8,7 @@ A **whatsabladerunner** is a special ~~police officer~~ *pig bot* tasked with hu
 
 ## The License
 
-The task was too big and resources too little. So whatsabladerunner is free and open source under the **"STEAL THIS LICENSE" v1 license**.
+The task was too big and resources too little. So whatsabladerunner is free and open source under the [**"STEAL THIS LICENSE" v1 license**](LICENSE).
 
 ## The Economics
 
@@ -31,7 +31,6 @@ A: All of it is lost, like tears in rain.
 If you are new to **whatsabladerunner**, you should check out these documents:
 
 - [Installation Guide](INSTALL.md)
+- [Safety & Privacy](SAFETY.md)
 - [Design Principles](DESIGN.md)
 - [Code Overview](CODE.md)
-- [Safety & Privacy](SAFETY.md)
-
