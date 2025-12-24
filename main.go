@@ -27,6 +27,7 @@ import (
 
 	"whatsabladerunner/pkg/agent"
 	"whatsabladerunner/pkg/batata"
+	"whatsabladerunner/pkg/behaviors"
 	"whatsabladerunner/pkg/bot"
 	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/buttons"
@@ -428,10 +429,80 @@ func eventHandler(evt interface{}) {
 				return
 			}
 
-			// Check if there's an active task for this chat
 			chatJID := v.Info.Chat.String()
 
 			if msgText != "" && taskBot != nil {
+				// 1. Check for Active Behaviors
+				activeBehaviors, err := taskBot.BehaviorManager.GetActiveBehaviors(chatJID)
+				if err != nil {
+					fmt.Printf("Error checking behaviors: %v\n", err)
+				} else if len(activeBehaviors) > 0 {
+					fmt.Printf("Active behaviors found for %s: %d\n", chatJID, len(activeBehaviors))
+
+					go func(cJID string, behaviors []behaviors.Behavior) {
+						// Debounce 5s
+						time.Sleep(5 * time.Second)
+
+						// Lock per contact for behaviors
+						lockKey := fmt.Sprintf("behavior:%s", cJID)
+						taskLocks.Lock(lockKey)
+						defer taskLocks.Unlock(lockKey)
+
+						// Fetch new messages (simple fetch last 10 for now or track timestamp?)
+						// Behaviors are stateless streams usually, but we should track what we processed.
+						// But Behavior struct doesn't have LastProcessedTimestamp.
+						// Creating one implies saving state which we avoided for now.
+						// We'll just fetch *Recent* messages (last 10) including the one that triggered this.
+						// AND assume the LLM handles context duplication.
+						// Ideally we'd have a cursor. But prompt injection is "stateless" per turn.
+
+						// Context: Get recent messages
+						contextMsgs, err := historyStore.GetRecentMessages(cJID, 10)
+						if err != nil {
+							fmt.Printf("Failed to get context for behaviors: %v\n", err)
+							return
+						}
+
+						// We use the *latest* message as the primary trigger?
+						// Or we pass the whole context?
+						// ProcessBehaviors takes (activeBehaviors, msg, context, sendToContact)
+						// We'll pass "" as msg and let context carry the conversation, OR pass the very last message.
+						// Let's pass the last message as 'msg' if we can extract it, but GetRecentMessages returns strings.
+						// Better: Pass empty msg and full context. The prompt template usually puts context in {{.Context}}.
+						// The 'Message' field in ModeData is often the *new* input.
+						// If we pass empty, the LLM relies on context.
+
+						// Let's try to get the actual text of the latest message for 'msg'.
+						latestText := ""
+						if len(contextMsgs) > 0 {
+							latestText = contextMsgs[len(contextMsgs)-1]
+						}
+
+						sendToContact := func(msg string) {
+							if whatsAppClient != nil {
+								contactJID, _ := types.ParseJID(cJID)
+								resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+									Conversation: proto.String(msg),
+								})
+								if err != nil {
+									fmt.Printf("Failed to send behavior message: %v\n", err)
+								} else {
+									historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
+								}
+							}
+						}
+
+						// Process
+						_, err = taskBot.ProcessBehaviors(behaviors, latestText, contextMsgs, sendToContact)
+						if err != nil {
+							fmt.Printf("Behavior processing failed: %v\n", err)
+						}
+
+					}(chatJID, activeBehaviors)
+				}
+
+				// 2. Check for Task
+				// Check by both chat ID and contact for task matching
 				// Check by both chat ID and contact for task matching
 				fmt.Printf("DEBUG: Checking for task with chat ID: %s\n", chatJID)
 				task, err := taskBot.TaskManager.GetTaskByContact(chatJID)

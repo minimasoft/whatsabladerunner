@@ -12,7 +12,7 @@ Your response must be a single JSON object containing a list of actions to execu
 
 {{.AvailableActions}}
 
-**JSON Response Structure Example:**
+**JSON Response Structure Example (valid JSON, array of actions):**
 
 ```json
 {
@@ -21,15 +21,7 @@ Your response must be a single JSON object containing a list of actions to execu
       "type": "response",
       "content": "This is a simple string payload."
     },
-    {
-      "type": "create_task",
-      "content": {
-        "objective": "Task objective...",
-        "contact": "12345@whats.me",
-        "original_orders": "Original request...",
-        "schedule_datetime": "2024-12-31T23:59"
-      }
-    }
+    ...
   ]
 }
 ```

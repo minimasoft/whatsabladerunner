@@ -1,4 +1,3 @@
-- Implement contact search so the context for command is not bloated, this is not trivial as the response should be added to the previous prompt chat for it to make sense.
 - Implement basic custom actions to allow integrations.
 - Implement basic audio processing with Whisper :D
 - Implement basic behavior.

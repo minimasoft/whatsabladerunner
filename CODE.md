@@ -35,7 +35,7 @@ The project is structured as a Go application with various internal packages loc
 
 **The Extensibility Layer.**
 
-- **Purpose**: Defines and registers actions the LLM can perform (e.g., `memory_update`, `create_task`, `send_media`).
+- **Purpose**: Defines and registers actions the LLM can perform (e.g., `memory_update`, `create_task`, `send_media`, `enable_behavior`).
 - **Main Types**: `Registry` (action storage), `Action` (interface for implementations).
 - **Integration**: New functionality should be added as an `Action` and registered in `bot.go`.
 
@@ -46,6 +46,14 @@ The project is structured as a Go application with various internal packages loc
 - **Purpose**: Manages long-running tasks, their lifecycle (Pending, Running, Finished), and scheduling.
 - **Main Types**: `TaskManager` (file-based CRUD), `Task` (structure representing work).
 - **Integrations**: `CheckScheduledTasks` is called periodically by a ticker in `main.go`.
+
+#### [`pkg/behaviors`](./pkg/behaviors)
+
+**The Persona/Rules Layer.**
+
+- **Purpose**: Manages active behavioral directives (personas/rules) enabled for specific contacts.
+- **Main Types**: `BehaviorManager`, `Behavior`.
+- **Core Logic**: `ProcessBehaviors` in `bot.go` injects behavior content into the prompt.
 
 #### [`pkg/llm`](./pkg/llm)
 
@@ -66,8 +74,8 @@ The project is structured as a Go application with various internal packages loc
 
 **Prompt Management.**
 
-- **Purpose**: Manages template-based prompts for different modes (Chat, Task, Watcher).
-- **Main Types**: `PromptManager`, `ModeData` (template context).
+- **Purpose**: Manages template-based prompts for different modes (Chat, Task, Behavior, Watcher).
+- **Main Types**: `PromptManager`, `ModeData`, `BehaviorData`.
 
 #### [`pkg/buttons`](./pkg/buttons)
 

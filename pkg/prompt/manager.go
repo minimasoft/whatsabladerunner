@@ -25,6 +25,11 @@ type ModeData struct {
 	AvailableActions string // JSON schema of available actions
 }
 
+type BehaviorData struct {
+	ModeData
+	EnabledBehaviors string // Content of enabled behaviors
+}
+
 type PromptManager struct {
 	ConfigDir string
 }
@@ -106,6 +111,39 @@ func (pm *PromptManager) LoadWatcherPrompt(data WatcherData) (string, error) {
 	protocolContent, err := pm.renderFile(protocolPath, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to load watcher protocol.txt: %w", err)
+	}
+	sb.WriteString(protocolContent)
+	sb.WriteString("\n")
+
+	return sb.String(), nil
+}
+
+func (pm *PromptManager) LoadBehaviorPrompt(data BehaviorData) (string, error) {
+	var sb strings.Builder
+
+	// 1. Load context.txt
+	contextPath := filepath.Join(pm.ConfigDir, "modes", "context.txt")
+	contextContent, err := pm.renderFile(contextPath, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to load behavior context.txt: %w", err)
+	}
+	sb.WriteString(contextContent)
+	sb.WriteString("\n")
+
+	// 2. Load __base.txt templated with enabled behaviors
+	basePath := filepath.Join(pm.ConfigDir, "modes", "behavior", "__base.txt")
+	baseContent, err := pm.renderFile(basePath, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to load behavior __base.txt: %w", err)
+	}
+	sb.WriteString(baseContent)
+	sb.WriteString("\n")
+
+	// 3. Load protocol.txt
+	protocolPath := filepath.Join(pm.ConfigDir, "modes", "protocol.txt")
+	protocolContent, err := pm.renderFile(protocolPath, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to load behavior protocol.txt: %w", err)
 	}
 	sb.WriteString(protocolContent)
 	sb.WriteString("\n")

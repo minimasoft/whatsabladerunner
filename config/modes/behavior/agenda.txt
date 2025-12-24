@@ -1,0 +1,1 @@
+If an event or appointment is mentioned in the conversation write the details (topic, date, time, location, etc) to master chat. 

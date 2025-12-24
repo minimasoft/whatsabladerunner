@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"whatsabladerunner/pkg/behaviors"
 	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/llm"
 	"whatsabladerunner/pkg/prompt"
@@ -13,11 +14,12 @@ import (
 )
 
 type Bot struct {
-	Client         llm.Client
-	PromptManager  *prompt.PromptManager
-	TaskManager    *tasks.TaskManager
-	ActionRegistry *actions.Registry
-	ConfigDir      string
+	Client          llm.Client
+	PromptManager   *prompt.PromptManager
+	TaskManager     *tasks.TaskManager
+	BehaviorManager *behaviors.BehaviorManager
+	ActionRegistry  *actions.Registry
+	ConfigDir       string
 
 	SendFunc               func(string)
 	SendMasterFunc         func(string)
@@ -36,14 +38,15 @@ type Bot struct {
 
 func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
 	b := &Bot{
-		Client:         client,
-		PromptManager:  prompt.NewPromptManager(configDir),
-		TaskManager:    tasks.NewTaskManager(filepath.Join(configDir, "tasks")),
-		ActionRegistry: actions.NewRegistry(),
-		ConfigDir:      configDir,
-		SendFunc:       sendFunc,
-		SendMasterFunc: sendMasterFunc,
-		Contacts:       contacts,
+		Client:          client,
+		PromptManager:   prompt.NewPromptManager(configDir),
+		TaskManager:     tasks.NewTaskManager(filepath.Join(configDir, "tasks")),
+		BehaviorManager: behaviors.NewBehaviorManager(filepath.Join(configDir, "behaviors")),
+		ActionRegistry:  actions.NewRegistry(),
+		ConfigDir:       configDir,
+		SendFunc:        sendFunc,
+		SendMasterFunc:  sendMasterFunc,
+		Contacts:        contacts,
 	}
 
 	b.registerActions()
@@ -51,6 +54,10 @@ func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMast
 }
 
 func (b *Bot) registerActions() {
+	// Behaviors
+	b.ActionRegistry.Register(&actions.EnableBehaviorAction{})
+	b.ActionRegistry.Register(&actions.DisableBehaviorAction{})
+
 	// Memory Update & Append
 	b.ActionRegistry.Register(&actions.MemoryUpdateAction{
 		MemoriesPath: filepath.Join(b.ConfigDir, "memories.txt"),
@@ -314,8 +321,9 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 			}
 
 			ctx := actions.ActionContext{
-				Context:     context,
-				ToolOutputs: &toolOutputs,
+				Context:         context,
+				BehaviorManager: b.BehaviorManager,
+				ToolOutputs:     &toolOutputs,
 			}
 
 			if err := act.Execute(ctx, rawAction.Content); err != nil {
@@ -457,10 +465,11 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 			}
 
 			ctx := actions.ActionContext{
-				Context:       context,
-				Task:          task,
-				SendToContact: sendToContact,
-				ToolOutputs:   &toolOutputs,
+				Context:         context,
+				Task:            task,
+				BehaviorManager: b.BehaviorManager,
+				SendToContact:   sendToContact,
+				ToolOutputs:     &toolOutputs,
 			}
 
 			if err := act.Execute(ctx, rawAction.Content); err != nil {
@@ -490,6 +499,150 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	return botResp, nil
 }
 
+// ProcessBehaviors processes a message with active behaviors enabled
+func (b *Bot) ProcessBehaviors(activeBehaviors []behaviors.Behavior, msg string, context []string, sendToContact func(string)) (*BotResponse, error) {
+	// 1. Load System Prompt
+	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load system prompt: %w", err)
+	}
+
+	// 2. Load Memories
+	memoriesPath := filepath.Join(b.ConfigDir, "memories.txt")
+	memoriesContent, err := os.ReadFile(memoriesPath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to read memories: %w", err)
+	}
+
+	// 3. Prepare Behaviors Content
+	var behaviorsContent strings.Builder
+	for _, behavior := range activeBehaviors {
+		// Verify file exists in config/modes/behavior/<Name>.txt
+		path := filepath.Join(b.ConfigDir, "modes", "behavior", behavior.Name+".txt")
+		content, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Printf("Warning: failed to read behavior file %s: %v\n", behavior.Name, err)
+			continue
+		}
+		behaviorsContent.WriteString(fmt.Sprintf("\n--- Behavior: %s (Comments: %s) ---\n", behavior.Name, behavior.Comments))
+		behaviorsContent.WriteString(string(content))
+		behaviorsContent.WriteString("\n-------------------------------------\n")
+	}
+
+	// 4. Load Behavior Prompt
+	behaviorData := prompt.BehaviorData{
+		ModeData: prompt.ModeData{
+			Memories:         string(memoriesContent),
+			Tasks:            "[]",
+			Contacts:         "[]",
+			Context:          strings.Join(context, "\n"),
+			Message:          msg,
+			AvailableActions: b.getAvailableActionsJSON(),
+		},
+		EnabledBehaviors: behaviorsContent.String(),
+	}
+
+	behaviorPrompt, err := b.PromptManager.LoadBehaviorPrompt(behaviorData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load behavior prompt: %w", err)
+	}
+
+	msgs := []llm.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: behaviorPrompt},
+	}
+
+	respMsg, err := b.Client.Chat(msgs, map[string]interface{}{"log_tag": "behavior"})
+	if err != nil {
+		return nil, fmt.Errorf("ollama chat failed: %w", err)
+	}
+
+	// 5. Parse Response
+	content := respMsg.Content
+	content = cleanJSON(content)
+
+	var rawResp RawBotResponse
+	if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
+		fmt.Printf("Raw response: %s\n", respMsg.Content)
+		// Don't fail hard on JSON parse if it's just chatter, but behaviors should return actions usually.
+		// If fails, maybe the LLM just talked?
+		// We'll treat it as error for now to match other modes.
+		return nil, fmt.Errorf("failed to parse bot response json: %w", err)
+	}
+
+	botResp := &BotResponse{}
+
+	// 6. Execute Actions (with recursion support similar to tasks)
+	maxRecursion := 5
+	recursionDepth := 0
+	currentMsg := msg
+
+	for {
+		if recursionDepth > maxRecursion {
+			break
+		}
+
+		if recursionDepth > 0 {
+			behaviorData.Message = currentMsg
+			behaviorPrompt, err = b.PromptManager.LoadBehaviorPrompt(behaviorData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to reload behavior prompt: %w", err)
+			}
+			msgs[1].Content = behaviorPrompt
+
+			respMsg, err = b.Client.Chat(msgs, map[string]interface{}{"log_tag": "behavior"})
+			if err != nil {
+				return nil, fmt.Errorf("ollama chat failed in recursion: %w", err)
+			}
+			content = cleanJSON(respMsg.Content)
+			if err := json.Unmarshal([]byte(content), &rawResp); err != nil {
+				return nil, fmt.Errorf("failed to parse bot response json: %w", err)
+			}
+		}
+
+		toolOutputs := []string{}
+
+		for i, rawAction := range rawResp.Actions {
+			fmt.Printf("[Bot/Behavior] Processing action %d: type=%s\n", i+1, rawAction.Type)
+
+			act, ok := b.ActionRegistry.Get(rawAction.Type)
+			if !ok {
+				fmt.Printf("Warning: received unknown action '%s' in behavior mode\n", rawAction.Type)
+				continue
+			}
+
+			// Note: Task is nil for behaviors
+			ctx := actions.ActionContext{
+				Context:         context,
+				BehaviorManager: b.BehaviorManager,
+				SendToContact:   sendToContact,
+				ToolOutputs:     &toolOutputs,
+			}
+
+			if err := act.Execute(ctx, rawAction.Content); err != nil {
+				fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
+			}
+
+			var contentStr string
+			if rawAction.Content != nil {
+				if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
+					contentStr = string(rawAction.Content)
+				}
+			}
+			botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
+		}
+
+		if len(toolOutputs) > 0 {
+			recursionDepth++
+			combinedOutputs := strings.Join(toolOutputs, "\n")
+			currentMsg = fmt.Sprintf("%s\n\n[System: Tool Results]\n%s", currentMsg, combinedOutputs)
+			continue
+		}
+		break
+	}
+
+	return botResp, nil
+}
 func cleanJSON(content string) string {
 	content = strings.TrimSpace(content)
 	// Find the start of the JSON object

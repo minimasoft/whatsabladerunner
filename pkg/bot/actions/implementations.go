@@ -9,6 +9,103 @@ import (
 	"whatsabladerunner/pkg/tasks"
 )
 
+// --- EnableBehaviorAction ---
+
+type EnableBehaviorAction struct {
+	// Function usually injected or we use ctx.BehaviorManager
+}
+
+func (a *EnableBehaviorAction) GetSchema() ActionSchema {
+	return ActionSchema{
+		Name:        "enable_behavior",
+		Description: "Enable a behavior for a contact. The behavior file must exist in config/modes/behavior/ (without extension).",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"contact": {"type": "string", "description": "The contact JID or number."},
+				"behavior": {"type": "string", "description": "The name of the behavior file (e.g. 'sales_agent')."},
+				"comments": {"type": "string", "description": "Additional context or comments."}
+			},
+			"required": ["contact", "behavior"]
+		}`),
+	}
+}
+
+func (a *EnableBehaviorAction) Execute(ctx ActionContext, payload json.RawMessage) error {
+	if ctx.BehaviorManager == nil {
+		return fmt.Errorf("behavior manager not available in context")
+	}
+
+	var input struct {
+		Contact  string `json:"contact"`
+		Behavior string `json:"behavior"`
+		Comments string `json:"comments"`
+	}
+
+	// Handle stringified JSON
+	var contentStr string
+	if err := json.Unmarshal(payload, &contentStr); err == nil {
+		if err := json.Unmarshal([]byte(contentStr), &input); err != nil {
+			return fmt.Errorf("failed to parse stringified enable_behavior content: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(payload, &input); err != nil {
+			return fmt.Errorf("failed to parse enable_behavior content: %w", err)
+		}
+	}
+
+	b, err := ctx.BehaviorManager.EnableBehavior(input.Contact, input.Behavior, input.Comments)
+	if err != nil {
+		return fmt.Errorf("failed to enable behavior: %w", err)
+	}
+
+	if ctx.ToolOutputs != nil {
+		*ctx.ToolOutputs = append(*ctx.ToolOutputs, fmt.Sprintf("Behavior %d ('%s') enabled for %s.", b.ID, b.Name, b.Contact))
+	}
+	return nil
+}
+
+// --- DisableBehaviorAction ---
+
+type DisableBehaviorAction struct{}
+
+func (a *DisableBehaviorAction) GetSchema() ActionSchema {
+	return ActionSchema{
+		Name:        "disable_behavior",
+		Description: "Disable (remove) a behavior by ID.",
+		Parameters:  json.RawMessage(`{"type": "string", "description": "The Behavior ID."}`),
+	}
+}
+
+func (a *DisableBehaviorAction) Execute(ctx ActionContext, payload json.RawMessage) error {
+	if ctx.BehaviorManager == nil {
+		return fmt.Errorf("behavior manager not available in context")
+	}
+
+	var idStr string
+	if err := json.Unmarshal(payload, &idStr); err != nil {
+		var idInt int
+		if err := json.Unmarshal(payload, &idInt); err != nil {
+			return fmt.Errorf("invalid payload for disable_behavior: %w", err)
+		}
+		idStr = strconv.Itoa(idInt)
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return fmt.Errorf("invalid behavior ID: %w", err)
+	}
+
+	if err := ctx.BehaviorManager.DisableBehavior(id); err != nil {
+		return err
+	}
+
+	if ctx.ToolOutputs != nil {
+		*ctx.ToolOutputs = append(*ctx.ToolOutputs, fmt.Sprintf("Behavior %d disabled.", id))
+	}
+	return nil
+}
+
 // --- MemoryUpdateAction ---
 
 type MemoryUpdateAction struct {

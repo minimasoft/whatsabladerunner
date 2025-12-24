@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"whatsabladerunner/pkg/behaviors"
 	"whatsabladerunner/pkg/tasks"
 )
 
@@ -16,10 +17,11 @@ type ActionSchema struct {
 
 // ActionContext holds execution context
 type ActionContext struct {
-	Context       []string
-	Task          *tasks.Task // nil if not in task mode
-	SendToContact func(string)
-	ToolOutputs   *[]string // New: For returning tool results to the loop
+	Context         []string
+	Task            *tasks.Task // nil if not in task mode
+	BehaviorManager *behaviors.BehaviorManager
+	SendToContact   func(string)
+	ToolOutputs     *[]string // New: For returning tool results to the loop
 }
 
 // Action represents an executable action
