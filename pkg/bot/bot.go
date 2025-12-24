@@ -178,8 +178,6 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 		return false, "", fmt.Errorf("watcher ollama chat failed: %w", err)
 	}
 
-	fmt.Printf("DEBUG: Watcher Response:\n%s\n---------------------\n", respMsg.Content)
-
 	content := cleanJSON(respMsg.Content)
 	var watcherResp WatcherResponse
 	if err := json.Unmarshal([]byte(content), &watcherResp); err != nil {
@@ -256,7 +254,6 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	}
 
 	// 5. Parse Response
-	fmt.Printf("DEBUG: Raw Ollama Response:\n%s\n---------------------\n", respMsg.Content)
 
 	content := respMsg.Content
 	content = cleanJSON(content)
@@ -366,7 +363,6 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	}
 
 	// 6. Parse Response
-	fmt.Printf("DEBUG: Raw Ollama Response (Task Mode) [Processing %d chars of input]:\n%s\n---------------------\n", len(msg), respMsg.Content)
 
 	content := respMsg.Content
 	content = cleanJSON(content)

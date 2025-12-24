@@ -111,16 +111,9 @@ func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
 		fmt.Println("------------------------------------------------")
-		fmt.Printf("Received a message!\n")
-		fmt.Printf("  ID: %s\n", v.Info.ID)
-		fmt.Printf("  Time: %s\n", v.Info.Timestamp)
-		fmt.Printf("  Sender: %s\n", v.Info.Sender)
-		fmt.Printf("  PushName: %s\n", v.Info.PushName)
-		fmt.Printf("  Chat: %s\n", v.Info.Chat)
-		fmt.Printf("  IsFromMe: %v\n", v.Info.IsFromMe)
-		fmt.Printf("  IsGroup: %v\n", v.Info.IsGroup)
-		fmt.Printf("  MessageSource: %+v\n", v.Info.MessageSource)
-		fmt.Printf("DEBUG: Message Struct: %+v\n", v.Message)
+		fmt.Printf("Received a message!\nInfo: %+v\n", v.Info)
+		fmt.Printf("Message Struct: %+v\n", v.Message)
+		fmt.Println("------------------------------------------------")
 
 		// Save message to history
 		// We want to save ALL text messages to history to have a full log.
