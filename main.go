@@ -954,6 +954,12 @@ func main() {
 				time.Sleep(5 * time.Second) // Give time to connect fully
 				batataKernel.StartSetup(sendToSelf)
 			}()
+		} else {
+			// Already configured, inform the actual configuration
+			go func() {
+				time.Sleep(5 * time.Second) // Give time to connect fully
+				reinitLLM(selfJID)
+			}()
 		}
 	}
 
