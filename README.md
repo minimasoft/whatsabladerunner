@@ -7,9 +7,11 @@ A **whatsabladerunner** is a special ~~police officer~~ *pig bot* tasked with hu
 
 
 ## The License
+
 The task was too big and resources too little. So whatsabladerunner is free and open source under the **"STEAL THIS LICENSE" v1 license**.
 
 ## The Economics
+
 whatsabladerunner is the ultimate capitalist tool: it will increase your time utility as much as you need for the great price of **$0.**
 
 That's a GREAT DEAL! Kids who finish school know that:
@@ -22,5 +24,14 @@ $$\lim_{price \to 0} \frac{Utility}{Price} = \infty$$
 
 #### **Q: What about the time spent developing whatsabladerunner?**
 
-A: All of it is lost, like tears in rain. 
+A: All of it is lost, like tears in rain.
+
+## Getting Started
+
+If you are new to **whatsabladerunner**, you should check out these documents:
+
+- [Installation Guide](INSTALL.md)
+- [Design Principles](DESIGN.md)
+- [Code Overview](CODE.md)
+- [Safety & Privacy](SAFETY.md)
 
