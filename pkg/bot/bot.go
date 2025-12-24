@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/llm"
 	"whatsabladerunner/pkg/prompt"
 	"whatsabladerunner/pkg/tasks"
 )
 
 type Bot struct {
-	Client        llm.Client
-	PromptManager *prompt.PromptManager
-	TaskManager   *tasks.TaskManager
-	ConfigDir     string
+	Client         llm.Client
+	PromptManager  *prompt.PromptManager
+	TaskManager    *tasks.TaskManager
+	ActionRegistry *actions.Registry
+	ConfigDir      string
 
 	SendFunc               func(string)
 	SendMasterFunc         func(string)
@@ -24,6 +25,7 @@ type Bot struct {
 	SendMediaFunc          func(chatJID string, mediaID int64) // For sending media back
 	Contacts               string                              // JSON formatted string of contacts
 	StartTaskCallback      func(*tasks.Task)                   // Called when a task is confirmed to start it
+	ResumeTaskCallback     func(*tasks.Task)                   // Called when a task is resumed
 
 	// OnWatcherBlock is called when watcher blocks a message, allowing the caller to store it for potential override
 	OnWatcherBlock func(blockedMsg string, targetChatJID string, sendFunc func(string))
@@ -33,15 +35,93 @@ type Bot struct {
 }
 
 func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
-	return &Bot{
+	b := &Bot{
 		Client:         client,
 		PromptManager:  prompt.NewPromptManager(configDir),
 		TaskManager:    tasks.NewTaskManager(filepath.Join(configDir, "tasks")),
+		ActionRegistry: actions.NewRegistry(),
 		ConfigDir:      configDir,
 		SendFunc:       sendFunc,
 		SendMasterFunc: sendMasterFunc,
 		Contacts:       contacts,
 	}
+
+	b.registerActions()
+	return b
+}
+
+func (b *Bot) registerActions() {
+	// Memory Update & Append
+	b.ActionRegistry.Register(&actions.MemoryUpdateAction{
+		MemoriesPath: filepath.Join(b.ConfigDir, "memories.txt"),
+	})
+	b.ActionRegistry.Register(&actions.MemoryAppendAction{
+		MemoriesPath: filepath.Join(b.ConfigDir, "memories.txt"),
+	})
+
+	// Response
+	b.ActionRegistry.Register(&actions.ResponseAction{
+		SendFunc:       b.SendFunc,
+		CheckMessage:   b.CheckMessage,
+		SendMasterFunc: b.SendMasterFunc,
+		OnWatcherBlock: func(blockedMsg string, targetChatJID string, sendFunc func(string)) {
+			if b.OnWatcherBlock != nil {
+				b.OnWatcherBlock(blockedMsg, targetChatJID, sendFunc)
+			}
+		},
+	})
+
+	// Message Master
+	b.ActionRegistry.Register(&actions.MessageMasterAction{
+		SendMasterFunc: b.SendMasterFunc,
+	})
+
+	// Create Task
+	b.ActionRegistry.Register(&actions.CreateTaskAction{
+		TaskManager: b.TaskManager,
+		GetContacts: func() string { return b.Contacts },
+		SendFunc:    b.SendFunc,
+	})
+
+	// Task Management
+	taskActions := []actions.TaskActionType{
+		actions.TaskDelete,
+		actions.TaskConfirm,
+		actions.TaskPause,
+		actions.TaskResume,
+	}
+	for _, t := range taskActions {
+		b.ActionRegistry.Register(&actions.TaskManagementAction{
+			Type:        t,
+			TaskManager: b.TaskManager,
+			StartTaskCallback: func(task *tasks.Task) {
+				if b.StartTaskCallback != nil {
+					b.StartTaskCallback(task)
+				}
+			},
+			ResumeTaskCallback: func(task *tasks.Task) {
+				if b.ResumeTaskCallback != nil {
+					b.ResumeTaskCallback(task)
+				}
+			},
+		})
+	}
+
+	// Send Media
+	b.ActionRegistry.Register(&actions.SendMediaAction{
+		SendMediaFunc: b.SendMediaFunc,
+		ToMaster:      false,
+	})
+	b.ActionRegistry.Register(&actions.SendMediaAction{
+		SendMediaFunc: b.SendMediaFunc,
+		ToMaster:      true,
+	})
+
+	// Button Response
+	b.ActionRegistry.Register(&actions.ButtonResponseAction{
+		SendButtonResponseFunc: b.SendButtonResponseFunc,
+		TaskManager:            b.TaskManager,
+	})
 }
 
 // RawAction is used for initial parsing to handle flexible content types
@@ -113,6 +193,15 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 	return true, "", nil
 }
 
+func (b *Bot) getAvailableActionsJSON() string {
+	schemas := b.ActionRegistry.GetSchemas()
+	data, err := json.MarshalIndent(schemas, "", "  ")
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
 func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, error) {
 	// 1. Load System Prompt
 	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
@@ -141,11 +230,12 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 
 	// 4. Load Mode Prompt
 	modeData := prompt.ModeData{
-		Memories: string(memoriesContent),
-		Tasks:    string(tasksJSON),
-		Contacts: b.Contacts,
-		Context:  strings.Join(context, "\n"),
-		Message:  msg,
+		Memories:         string(memoriesContent),
+		Tasks:            string(tasksJSON),
+		Contacts:         b.Contacts,
+		Context:          strings.Join(context, "\n"),
+		Message:          msg,
+		AvailableActions: b.getAvailableActionsJSON(),
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt(mode, modeData)
 	if err != nil {
@@ -182,154 +272,43 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 
 	// 6. Execute Actions
 	for i, rawAction := range rawResp.Actions {
-		// Parse content as string for most actions
+		fmt.Printf("[Bot] Processing action %d: type=%s\n", i+1, rawAction.Type)
+
+		act, ok := b.ActionRegistry.Get(rawAction.Type)
+		if !ok {
+			fmt.Printf("Warning: received unknown action '%s'\n", rawAction.Type)
+			continue
+		}
+
+		ctx := actions.ActionContext{
+			Context: context,
+		}
+
+		if err := act.Execute(ctx, rawAction.Content); err != nil {
+			fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
+			if b.SendFunc != nil {
+				// Inform user about internal error?
+				// b.SendFunc(fmt.Sprintf("[Blady] : Internal error executing action %s: %v", rawAction.Type, err))
+			}
+		}
+
+		// Backward compatibility: Populate BotResponse.Actions strings
+		// Some callers might act on BotResponse (main.go doesn't seem to use actions from response,
+		// it uses SendFunc etc. side effects).
+		// BotResponse struct is effectively just logging or unused return?
+		// Checking main.go usage of Process result:
+		// _, err := taskBot.Process(...)
+		// It ignores the returned *BotResponse (except for error).
+		// So we strictly rely on side effects.
+
+		// Parse content to string for legacy logging/compatibility in BotResponse
 		var contentStr string
 		if rawAction.Content != nil {
-			// Try to unmarshal as string first
 			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
-				// Not a string, keep raw for special handling
 				contentStr = string(rawAction.Content)
 			}
 		}
-
-		fmt.Printf("[Bot] Processing action %d: type=%s\n", i+1, rawAction.Type)
-
-		switch rawAction.Type {
-		case "memory_update":
-			if err := os.WriteFile(memoriesPath, []byte(contentStr), 0644); err != nil {
-				fmt.Printf("Failed to update memories: %v\n", err)
-			} else {
-				fmt.Println("Memories updated.")
-			}
-
-		case "response":
-			// In command mode, no watcher check - just send directly
-			if b.SendFunc != nil {
-				finalMsg := "[Blady] : " + contentStr
-				b.SendFunc(finalMsg)
-			}
-
-		case "message_master":
-			if b.SendMasterFunc != nil {
-				b.SendMasterFunc(contentStr)
-			}
-
-		case "create_task":
-			var taskContent tasks.CreateTaskContent
-			if err := json.Unmarshal(rawAction.Content, &taskContent); err != nil {
-				// Try unmarshaling from contentStr in case it was a double-quoted JSON string
-				if err := json.Unmarshal([]byte(contentStr), &taskContent); err != nil {
-					fmt.Printf("Failed to parse create_task content: %v (Raw: %s)\n", err, string(rawAction.Content))
-					if b.SendFunc != nil {
-						b.SendFunc("[Blady] : Error: No pude procesar la creación de tarea.")
-					}
-					continue
-				}
-			}
-
-			// Validate contact is in the contacts list
-			if !b.isValidContact(taskContent.Contact) {
-				fmt.Printf("Failed to create task: contact %s not in contacts list\n", taskContent.Contact)
-				if b.SendFunc != nil {
-					b.SendFunc(fmt.Sprintf("[Blady] : Error: El contacto '%s' no está en la lista de contactos. No se puede crear la tarea.", taskContent.Contact))
-				}
-				continue
-			}
-
-			task, err := b.TaskManager.CreateTask(taskContent.Objective, taskContent.Contact, taskContent.OriginalOrders, taskContent.ScheduleDatetime)
-			if err != nil {
-				fmt.Printf("Failed to create task: %v\n", err)
-				if b.SendFunc != nil {
-					b.SendFunc(fmt.Sprintf("[Blady] : Error al crear tarea: %v", err))
-				}
-			} else {
-				fmt.Printf("Task %d created successfully\n", task.ID)
-				// Print task JSON to self-chat
-				if b.SendFunc != nil {
-					taskJSON, _ := json.MarshalIndent(task, "", "  ")
-					b.SendFunc(fmt.Sprintf("[Blady] : Tarea creada:\n```json\n%s\n```", string(taskJSON)))
-				}
-			}
-
-		case "delete_task":
-			id, err := parseTaskID(contentStr)
-			if err != nil {
-				fmt.Printf("Failed to parse delete_task ID: %v\n", err)
-				continue
-			}
-			if err := b.TaskManager.DeleteTask(id); err != nil {
-				fmt.Printf("Failed to delete task %d: %v\n", id, err)
-			}
-
-		case "confirm_task":
-			id, err := parseTaskID(contentStr)
-			if err != nil {
-				fmt.Printf("Failed to parse confirm_task ID: %v\n", err)
-				continue
-			}
-			task, err := b.TaskManager.ConfirmTaskAndGet(id)
-			if err != nil {
-				fmt.Printf("Failed to confirm task %d: %v\n", id, err)
-			} else if b.StartTaskCallback != nil {
-				// Trigger task start callback
-				b.StartTaskCallback(task)
-			}
-
-		case "pause_task":
-			id, err := parseTaskID(contentStr)
-			if err != nil {
-				fmt.Printf("Failed to parse pause_task ID: %v\n", err)
-				continue
-			}
-			if err := b.TaskManager.PauseTask(id); err != nil {
-				fmt.Printf("Failed to pause task %d: %v\n", id, err)
-			}
-
-		case "resume_task":
-			id, err := parseTaskID(contentStr)
-			if err != nil {
-				fmt.Printf("Failed to parse resume_task ID: %v\n", err)
-				continue
-			}
-			if err := b.TaskManager.ResumeTask(id); err != nil {
-				fmt.Printf("Failed to resume task %d: %v\n", id, err)
-			}
-
-		case "send_media":
-			id, err := strconv.ParseInt(contentStr, 10, 64)
-			if err != nil {
-				fmt.Printf("Failed to parse send_media ID: %v\n", err)
-				continue
-			}
-			if b.SendMediaFunc != nil {
-				// In command mode, if we don't have a specific contact, where do we send it?
-				// User says "references by id and 'send_media_to_master' for master messages".
-				// If LLM says "send_media" without context, we might need to assume it's replying to the current conversation.
-				// For Note-to-Self, SendFunc sends to the master.
-				// Let's assume send_media sends to the "primary" chat of the context.
-				// In Process, this is tricky as there isn't a single 'contactJID' like in ProcessTask.
-				// However, if we are in Note-to-Self, we can send to master.
-				// For now, let's just use SendMediaFunc and let the implementation decide or provide a default.
-				// Actually, the user request says: "It references by id and 'send_media_to_master' for master messages."
-				// So if it's send_media, it probably means "to the user I'm talking to".
-				// I'll add a way to pass the target JID if possible, or use a default.
-				// Since Process doesn't have a chatJID, I'll pass empty for now or let the implementation handle it.
-				b.SendMediaFunc("", id)
-			}
-
-		case "send_media_to_master":
-			id, err := strconv.ParseInt(contentStr, 10, 64)
-			if err != nil {
-				fmt.Printf("Failed to parse send_media_to_master ID: %v\n", err)
-				continue
-			}
-			if b.SendMediaFunc != nil {
-				b.SendMediaFunc("master", id)
-			}
-
-		default:
-			fmt.Printf("Unknown action type: %s\n", rawAction.Type)
-		}
+		botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
 	}
 
 	return botResp, nil
@@ -361,12 +340,13 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 	// 5. Load Mode Prompt (task mode)
 	// Send empty tasks and contacts to focus on current task
 	modeData := prompt.ModeData{
-		Memories:    string(memoriesContent),
-		Tasks:       "[]", // Empty to focus on current task
-		Contacts:    "[]", // Empty to focus on conversation
-		Context:     strings.Join(context, "\n"),
-		Message:     msg,
-		CurrentTask: string(currentTaskJSON),
+		Memories:         string(memoriesContent),
+		Tasks:            "[]", // Empty to focus on current task
+		Contacts:         "[]", // Empty to focus on conversation
+		Context:          strings.Join(context, "\n"),
+		Message:          msg,
+		CurrentTask:      string(currentTaskJSON),
+		AvailableActions: b.getAvailableActionsJSON(),
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt("task", modeData)
 	if err != nil {
@@ -401,126 +381,34 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 
 	// 7. Execute Actions
 	for i, rawAction := range rawResp.Actions {
+		fmt.Printf("[Bot/Task] Processing action %d: type=%s\n", i+1, rawAction.Type)
+
+		act, ok := b.ActionRegistry.Get(rawAction.Type)
+		if !ok {
+			fmt.Printf("Warning: received unknown action '%s' in task mode\n", rawAction.Type)
+			continue
+		}
+
+		ctx := actions.ActionContext{
+			Context:       context,
+			Task:          task,
+			SendToContact: sendToContact,
+		}
+
+		if err := act.Execute(ctx, rawAction.Content); err != nil {
+			fmt.Printf("Error executing action %s: %v\n", rawAction.Type, err)
+		}
+
 		var contentStr string
 		if rawAction.Content != nil {
 			if err := json.Unmarshal(rawAction.Content, &contentStr); err != nil {
 				contentStr = string(rawAction.Content)
 			}
 		}
-
-		fmt.Printf("[Bot/Task] Processing action %d: type=%s\n", i+1, rawAction.Type)
-
-		switch rawAction.Type {
-		case "memory_update":
-			if err := os.WriteFile(memoriesPath, []byte(contentStr), 0644); err != nil {
-				fmt.Printf("Failed to update memories: %v\n", err)
-			} else {
-				fmt.Println("Memories updated.")
-			}
-
-		case "response":
-			// Watcher Check
-			proceed, reason, err := b.CheckMessage(contentStr, context)
-			if err != nil {
-				fmt.Printf("Watcher check error: %v\n", err)
-				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("[Blady][Watcher] : Error: %v", err))
-				}
-				continue
-			}
-
-			if !proceed {
-				fmt.Printf("Watcher BLOCKED message: %s. Reason: %s\n", contentStr, reason)
-				if b.SendMasterFunc != nil {
-					b.SendMasterFunc(fmt.Sprintf("[Blady][Watcher] : Blocked: \"%s\". Reason: %s ('LET IT BE' cancels block)", contentStr, reason))
-				}
-				// Store for potential override via OnWatcherBlock callback
-				if b.OnWatcherBlock != nil && sendToContact != nil {
-					b.OnWatcherBlock(contentStr, task.ChatID, sendToContact)
-				}
-				continue
-			}
-
-			// Send to contact (no [Blady] prefix for task conversations)
-			if sendToContact != nil {
-				sendToContact(contentStr)
-			}
-
-			// Transition task to running if pending
-			if task.Status == tasks.StatusPending {
-				if err := b.TaskManager.SetTaskRunning(task.ID); err != nil {
-					fmt.Printf("Failed to set task running: %v\n", err)
-				}
-			}
-
-		case "message_master":
-			if b.SendMasterFunc != nil {
-				// Use task-specific prefix when in task mode
-				b.SendMasterFunc(fmt.Sprintf("[Blady][Task %d] : %s", task.ID, contentStr))
-			}
-
-		case "pause_task":
-			if err := b.TaskManager.PauseTask(task.ID); err != nil {
-				fmt.Printf("Failed to pause task %d: %v\n", task.ID, err)
-			}
-
-		case "button_response":
-			var btnResp struct {
-				DisplayText string `json:"displayText"`
-				ButtonID    string `json:"buttonID"`
-			}
-			if err := json.Unmarshal(rawAction.Content, &btnResp); err != nil {
-				// Try unmarshaling from contentStr in case it was a double-quoted JSON string
-				if err := json.Unmarshal([]byte(contentStr), &btnResp); err != nil {
-					// Fallback: treat as a simple string button response
-					btnResp.DisplayText = contentStr
-					btnResp.ButtonID = ""
-				}
-			}
-			if b.SendButtonResponseFunc != nil {
-				b.SendButtonResponseFunc(btnResp.DisplayText, btnResp.ButtonID)
-			}
-			// Transition task to running if pending
-			if task.Status == tasks.StatusPending {
-				if err := b.TaskManager.SetTaskRunning(task.ID); err != nil {
-					fmt.Printf("Failed to set task running: %v\n", err)
-				}
-			}
-
-		case "send_media":
-			id, err := strconv.ParseInt(contentStr, 10, 64)
-			if err != nil {
-				fmt.Printf("Failed to parse send_media ID: %v\n", err)
-				continue
-			}
-			if b.SendMediaFunc != nil {
-				b.SendMediaFunc(task.ChatID, id)
-			}
-
-		case "send_media_to_master":
-			id, err := strconv.ParseInt(contentStr, 10, 64)
-			if err != nil {
-				fmt.Printf("Failed to parse send_media_to_master ID: %v\n", err)
-				continue
-			}
-			if b.SendMediaFunc != nil {
-				b.SendMediaFunc("master", id)
-			}
-
-		default:
-			fmt.Printf("Unknown action type in task mode: %s\n", rawAction.Type)
-		}
+		botResp.Actions = append(botResp.Actions, Action{Type: rawAction.Type, Content: contentStr})
 	}
 
 	return botResp, nil
-}
-
-// parseTaskID parses a task ID from a string that might be quoted or a number
-func parseTaskID(s string) (int, error) {
-	// Remove quotes if present
-	s = strings.Trim(s, `"`)
-	s = strings.TrimSpace(s)
-	return strconv.Atoi(s)
 }
 
 func cleanJSON(content string) string {
@@ -543,13 +431,4 @@ func cleanJSON(content string) string {
 		content = strings.TrimSuffix(content, "```")
 	}
 	return strings.TrimSpace(content)
-}
-
-// isValidContact checks if a contact number exists in the bot's contacts list
-func (b *Bot) isValidContact(contact string) bool {
-	if b.Contacts == "" || b.Contacts == "[]" {
-		return false
-	}
-	// Simple string check - the contact should appear as a "number" field value
-	return strings.Contains(b.Contacts, fmt.Sprintf(`"number":"%s"`, contact))
 }
