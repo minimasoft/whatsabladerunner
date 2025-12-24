@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -61,6 +62,50 @@ type WithheldMessage struct {
 var lastWithheldMessage *WithheldMessage
 
 const BotPrefix = "[Blady] : "
+
+func downloadMedia(msg *events.Message) ([]byte, string, string, error) {
+	var (
+		data  []byte
+		err   error
+		ext   string
+		mtype string
+	)
+
+	if msg.Message.ImageMessage != nil {
+		data, err = whatsAppClient.Download(context.Background(), msg.Message.ImageMessage)
+		ext = "jpg"
+		mtype = "image"
+	} else if msg.Message.VideoMessage != nil {
+		data, err = whatsAppClient.Download(context.Background(), msg.Message.VideoMessage)
+		ext = "mp4"
+		mtype = "video"
+	} else if msg.Message.AudioMessage != nil {
+		data, err = whatsAppClient.Download(context.Background(), msg.Message.AudioMessage)
+		ext = "ogg"
+		if msg.Message.AudioMessage.GetPTT() {
+			ext = "ogg"
+		}
+		mtype = "audio"
+	} else if msg.Message.DocumentMessage != nil {
+		data, err = whatsAppClient.Download(context.Background(), msg.Message.DocumentMessage)
+		mtype = "docs"
+		// Try to get extension from mimetype or filename
+		ext = "bin"
+		if msg.Message.DocumentMessage.Mimetype != nil {
+			parts := strings.Split(*msg.Message.DocumentMessage.Mimetype, "/")
+			if len(parts) > 1 {
+				ext = parts[1]
+			}
+		}
+	} else {
+		return nil, "", "", fmt.Errorf("unsupported media type")
+	}
+
+	if err != nil {
+		return nil, "", "", err
+	}
+	return data, mtype, ext, nil
+}
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -152,6 +197,80 @@ func eventHandler(evt interface{}) {
 				})
 				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s sender=%s senderAlt=%s\n",
 					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
+			}
+		}
+
+		// Media Handling
+		isSelfChat := v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User
+		var activeTask *tasks.Task
+		if !v.Info.IsFromMe {
+			activeTask, _ = taskBot.TaskManager.GetTaskByContact(v.Info.Chat.String())
+		}
+
+		if (isSelfChat || activeTask != nil) && v.Message != nil {
+			// Check if it's a media message
+			isMedia := v.Message.ImageMessage != nil || v.Message.VideoMessage != nil || v.Message.AudioMessage != nil || v.Message.DocumentMessage != nil
+			if isMedia {
+				fmt.Printf("Processing media message (Self: %v, Task: %v)\n", isSelfChat, activeTask != nil)
+				data, mtype, ext, err := downloadMedia(v)
+				if err != nil {
+					fmt.Printf("Failed to download media: %v\n", err)
+				} else {
+					// Save metadata to DB
+					var mimetype string
+					if v.Message.ImageMessage != nil {
+						mimetype = v.Message.ImageMessage.GetMimetype()
+					} else if v.Message.VideoMessage != nil {
+						mimetype = v.Message.VideoMessage.GetMimetype()
+					} else if v.Message.AudioMessage != nil {
+						mimetype = v.Message.AudioMessage.GetMimetype()
+					} else if v.Message.DocumentMessage != nil {
+						mimetype = v.Message.DocumentMessage.GetMimetype()
+					}
+
+					mediaID, err := historyStore.SaveMedia(history.MediaInfo{
+						MessageID: v.Info.ID,
+						ChatJID:   v.Info.Chat.String(),
+						SenderJID: v.Info.Sender.String(),
+						MediaType: mtype,
+						MimeType:  mimetype,
+						Timestamp: v.Info.Timestamp,
+					})
+
+					if err != nil {
+						fmt.Printf("Failed to save media metadata: %v\n", err)
+					} else {
+						// Store file
+						dir := filepath.Join("plain_media", mtype)
+						os.MkdirAll(dir, 0755)
+						filePath := filepath.Join(dir, fmt.Sprintf("%d.%s", mediaID, ext))
+						err = os.WriteFile(filePath, data, 0644)
+						if err != nil {
+							fmt.Printf("Failed to save media file: %v\n", err)
+						} else {
+							fmt.Printf("Media stored at %s\n", filePath)
+
+							// Update msgText so it's saved in history for LLM
+							mediaRef := fmt.Sprintf("[Media: %s ID: %d]", mtype, mediaID)
+							if msgText != "" {
+								msgText += "\n" + mediaRef
+							} else {
+								msgText = mediaRef
+							}
+
+							// Report to user in self-chat
+							if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+								selfJID := whatsAppClient.Store.ID.ToNonAD()
+								replyFunc := func(msg string) {
+									whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
+										Conversation: proto.String(msg),
+									})
+								}
+								batataKernel.ReportMediaStored(mtype, mediaID, replyFunc)
+							}
+						}
+					}
+				}
 			}
 		}
 

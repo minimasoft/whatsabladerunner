@@ -68,6 +68,7 @@ type Strings struct {
 	InvalidCerebrasKey    string
 	BrainError            string
 	BrainErrorSuggest     string
+	MediaStored           string
 }
 
 var LangStrings = map[Language]Strings{
@@ -99,6 +100,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key demasiado corta (min 20 chars). Volviendo...",
 		BrainError:            "⚠️ Error con el cerebro de Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Di 'Batata help' para re-configurar.",
+		MediaStored:           "📦 Media guardada: %s (ID: %d)",
 	},
 	LangEnglish: {
 		Intro:                 "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
@@ -128,6 +130,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key too short (min 20 chars). Going back...",
 		BrainError:            "⚠️ Error with Blady's brain: %s",
 		BrainErrorSuggest:     "ℹ️ Say 'Batata help' to re-configure.",
+		MediaStored:           "📦 Media stored: %s (ID: %d)",
 	},
 	LangHindi: {
 		Intro:                 "🥔 नमस्ते! मैं Batata हूँ, वह सरल कोर जो Blady के लिए बुनियादी ढांचे को संभालता है। आइए सब कुछ सेट करें!",
@@ -157,6 +160,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key बहुत छोटी है (कम से कम 20 वर्ण)। वापस जा रहे हैं...",
 		BrainError:            "⚠️ Blady के दिमाग में त्रुटि: %s",
 		BrainErrorSuggest:     "ℹ️ फिर से कॉन्फ़िगर करने के लिए 'Batata help' कहें।",
+		MediaStored:           "📦 मीडिया संग्रहीत: %s (ID: %d)",
 	},
 	LangPortuguese: {
 		Intro:                 "🥔 Olá! Sou o Batata, o núcleo simples que cuida da infraestrutura básica do Blady. Vamos configurar tudo!",
@@ -186,6 +190,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ Chave de API muito curta (mín. 20 caracteres). Voltando...",
 		BrainError:            "⚠️ Erro no cérebro do Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Diga 'Batata help' para reconfigurar.",
+		MediaStored:           "📦 Mídia armazenada: %s (ID: %d)",
 	},
 	LangBengali: {
 		Intro:                 "🥔 এটি Batata, একটি কম-প্রচেষ্টার সরল কোর যা whatsabladerunner-এর প্রধান Blady কোরের জন্য মৌলিক অবকাঠামো পরিচালনা করে। মৌলিক কনফিগারেশন অনুসরণ করবে।",
@@ -215,6 +220,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API কী খুব ছোট (ন্যূনতম ২০ অক্ষর)। ফিরে যাচ্ছি...",
 		BrainError:            "⚠️ Blady-এর মস্তিষ্কে ত্রুটি: %s",
 		BrainErrorSuggest:     "ℹ️ পুনরায় কনফিগার করতে 'Batata help' বলুন।",
+		MediaStored:           "📦 মিডিয়া সংরক্ষিত: %s (ID: %d)",
 	},
 	LangRussian: {
 		Intro:                 "🥔 Привет! Я Batata, простое ядро, которое управляет базовой инфраструктурой Blady. Давайте всё настроим!",
@@ -244,6 +250,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API-ключ слишком короткий (минимум 20 символов). Возвращаемся...",
 		BrainError:            "⚠️ Ошибка мозга Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Скажите 'Batata help' для перенастройки.",
+		MediaStored:           "📦 Медиа сохранено: %s (ID: %d)",
 	},
 	LangJapanese: {
 		Intro:                 "🥔 こんにちは！私はBatataです。Bladyの基本インフラを担当するシンプルなコアです。設定を始めましょう！",
@@ -273,6 +280,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ APIキーが短すぎます（最低20文字）。戻ります...",
 		BrainError:            "⚠️ Bladyの脳エラー: %s",
 		BrainErrorSuggest:     "ℹ️ 設定をやり直すには 'Batata help' と言ってください。",
+		MediaStored:           "📦 メディアが保存されました: %s (ID: %d)",
 	},
 	LangPunjabi: {
 		Intro:                 "🥔 ਇਹ Batata ਹੈ, ਇੱਕ ਘੱਟ-ਮਿਹਨਤ ਵਾਲਾ ਸਧਾਰਨ ਕੋਰ ਜੋ whatsabladerunner ਦੇ ਮੁੱਖ Blady ਕੋਰ ਲਈ ਬੁਨਿਆਦੀ ਢਾਂਚੇ ਦਾ ਧਿਆਨ ਰੱਖਦਾ ਹੈ। ਬੁਨਿਆਦੀ ਸੰਰਚਨਾ ਅੱਗੇ ਹੋਵੇਗੀ।",
@@ -302,6 +310,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API ਕੁੰਜੀ ਬਹੁਤ ਛੋਟੀ ਹੈ (ਘੱਟੋ-ਘੱਟ 20 ਅੱਖਰ)। ਵਾਪਸ ਜਾ ਰਹੇ ਹੋ...",
 		BrainError:            "⚠️ Blady ਦੇ ਦਿਮਾਗ ਵਿੱਚ ਗਲਤੀ: %s",
 		BrainErrorSuggest:     "ℹ️ ਮੁੜ-ਸੰਰਚਨਾ ਲਈ 'Batata help' ਕਹੋ।",
+		MediaStored:           "📦 ਮੀਡੀਆ ਸਟੋਰ ਕੀਤਾ ਗਿਆ: %s (ID: %d)",
 	},
 	LangVietnamese: {
 		Intro:                 "🥔 Đây là Batata, lõi đơn giản ít nỗ lực chịu trách nhiệm về cơ sở hạ tầng cơ bản cho lõi Blady chính của whatsabladerunner. Cấu hình cơ bản sẽ theo sau.",
@@ -331,6 +340,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key quá ngắn (tối thiểu 20 ký tự). Đang quay lại...",
 		BrainError:            "⚠️ Lỗi với não của Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Nói 'Batata help' để cấu hình lại.",
+		MediaStored:           "📦 Phương tiện đã lưu: %s (ID: %d)",
 	},
 	LangGerman: {
 		Intro:                 "🥔 Hey! Ich bin Batata, der einfache Kern, der die grundlegende Infrastruktur für Blady verwaltet. Lass uns alles einrichten!",
@@ -360,6 +370,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API-Key zu kurz (min. 20 Zeichen). Zurück...",
 		BrainError:            "⚠️ Fehler mit Bladys Gehirn: %s",
 		BrainErrorSuggest:     "ℹ️ Sag 'Batata help', um neu zu konfigurieren.",
+		MediaStored:           "📦 Medien gespeichert: %s (ID: %d)",
 	},
 	LangFrench: {
 		Intro:                 "🥔 Salut ! Je suis Batata, le noyau simple qui gère l'infrastructure de base pour Blady. Configurons tout ça !",
@@ -389,6 +400,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ Clé API trop courte (min 20 caractères). Retour...",
 		BrainError:            "⚠️ Erreur avec le cerveau de Blady : %s",
 		BrainErrorSuggest:     "ℹ️ Dites 'Batata help' pour reconfigurer.",
+		MediaStored:           "📦 Média stocké : %s (ID: %d)",
 	},
 	LangItalian: {
 		Intro:                 "🥔 Ciao! Sono Batata, il nucleo semplice che gestisce l'infrastruttura di base per Blady. Configuriamo tutto!",
@@ -447,6 +459,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ مفتاح API قصير جدًا (20 حرفًا على الأقل). جاري العودة...",
 		BrainError:            "⚠️ خطأ في دماغ Blady: %s",
 		BrainErrorSuggest:     "ℹ️ قل 'Batata help' لإعادة التكوين.",
+		MediaStored:           "📦 تم تخزين الوسائط: %s (ID: %d)",
 	},
 	LangTurkish: {
 		Intro:                 "🥔 Merhaba! Ben Batata, Blady için temel altyapıyı yöneten basit çekirdeğim. Hadi her şeyi ayarlayalım!",
@@ -476,6 +489,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API anahtarı çok kısa (en az 20 karakter). Geri dönülüyor...",
 		BrainError:            "⚠️ Blady'nin beyninde hata: %s",
 		BrainErrorSuggest:     "ℹ️ Yeniden yapılandırmak için 'Batata help' deyin.",
+		MediaStored:           "📦 Medya kaydedildi: %s (ID: %d)",
 	},
 	LangIndonesian: {
 		Intro:                 "🥔 Halo! Saya Batata, core sederhana yang menangani infrastruktur dasar untuk Blady. Ayo siapkan semuanya!",
@@ -505,6 +519,7 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key terlalu pendek (minimal 20 karakter). Kembali...",
 		BrainError:            "⚠️ Kesalahan pada otak Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Ucapkan 'Batata help' untuk mengonfigurasi ulang.",
+		MediaStored:           "📦 Media disimpan: %s (ID: %d)",
 	},
 }
 

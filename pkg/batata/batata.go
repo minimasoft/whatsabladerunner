@@ -302,3 +302,8 @@ func (k *Kernel) ReportLLMError(err error, sendFunc func(string)) {
 	sendFunc(msg(errMsg))
 	sendFunc(msg(suggestion))
 }
+
+func (k *Kernel) ReportMediaStored(mediaType string, mediaID int64, sendFunc func(string)) {
+	report := fmt.Sprintf(k.s(func(s Strings) string { return s.MediaStored }), mediaType, mediaID)
+	sendFunc(msg(report))
+}

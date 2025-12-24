@@ -18,7 +18,7 @@ func New(dbPath string) (*HistoryStore, error) {
 		return nil, fmt.Errorf("failed to open history db: %w", err)
 	}
 
-	// Create table if not exists
+	// Create tables if not exists
 	query := `
 	CREATE TABLE IF NOT EXISTS messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,10 +31,23 @@ func New(dbPath string) (*HistoryStore, error) {
 	);
 	CREATE INDEX IF NOT EXISTS idx_chat_jid ON messages(chat_jid);
 	CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
+
+	CREATE TABLE IF NOT EXISTS media (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		message_id TEXT UNIQUE,
+		chat_jid TEXT,
+		sender_jid TEXT,
+		media_type TEXT,
+		mimetype TEXT,
+		filename TEXT,
+		timestamp DATETIME,
+		extra_data_json TEXT
+	);
+	CREATE INDEX IF NOT EXISTS idx_media_chat_jid ON media(chat_jid);
 	`
 	_, err = db.Exec(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create messages table: %w", err)
+		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
 	return &HistoryStore{db: db}, nil
@@ -47,6 +60,47 @@ func (h *HistoryStore) SaveMessage(messageID, chatJID, senderJID, content string
 		return fmt.Errorf("failed to save message: %w", err)
 	}
 	return nil
+}
+
+// MediaInfo represents metadata for a stored media file
+type MediaInfo struct {
+	ID            int64
+	MessageID     string
+	ChatJID       string
+	SenderJID     string
+	MediaType     string
+	MimeType      string
+	Filename      string
+	Timestamp     time.Time
+	ExtraDataJSON string
+}
+
+func (h *HistoryStore) SaveMedia(info MediaInfo) (int64, error) {
+	query := `INSERT INTO media (message_id, chat_jid, sender_jid, media_type, mimetype, filename, timestamp, extra_data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	res, err := h.db.Exec(query, info.MessageID, info.ChatJID, info.SenderJID, info.MediaType, info.MimeType, info.Filename, info.Timestamp, info.ExtraDataJSON)
+	if err != nil {
+		return 0, fmt.Errorf("failed to save media: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert id: %w", err)
+	}
+	return id, nil
+}
+
+func (h *HistoryStore) GetMedia(id int64) (*MediaInfo, error) {
+	query := `SELECT id, message_id, chat_jid, sender_jid, media_type, mimetype, filename, timestamp, extra_data_json FROM media WHERE id = ?`
+	row := h.db.QueryRow(query, id)
+
+	var info MediaInfo
+	err := row.Scan(&info.ID, &info.MessageID, &info.ChatJID, &info.SenderJID, &info.MediaType, &info.MimeType, &info.Filename, &info.Timestamp, &info.ExtraDataJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get media: %w", err)
+	}
+	return &info, nil
 }
 
 func (h *HistoryStore) GetRecentMessages(chatJID string, limit int) ([]string, error) {
