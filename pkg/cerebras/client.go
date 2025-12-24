@@ -163,7 +163,8 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 				Role:    chatResp.Choices[0].Message.Role,
 				Content: chatResp.Choices[0].Message.Content,
 			}
-			llm.LogLLM("cerebras", messages, res)
+			logTag, _ := options["log_tag"].(string)
+			llm.LogLLM("cerebras", logTag, messages, res)
 			return res, nil
 		}
 
@@ -193,6 +194,7 @@ func (c *Client) Chat(messages []llm.Message, options map[string]interface{}) (*
 	if c.ErrorHandler != nil {
 		c.ErrorHandler(finalErr)
 	}
-	llm.LogLLM("cerebras", messages, nil)
+	logTag, _ := options["log_tag"].(string)
+	llm.LogLLM("cerebras", logTag, messages, nil)
 	return nil, finalErr
 }

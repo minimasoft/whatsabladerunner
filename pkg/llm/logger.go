@@ -8,9 +8,9 @@ import (
 )
 
 // LogLLM handles logging of LLM prompts and responses.
-// Filename convention: ISO8601 date with seconds + llm engine + prompt|response.
-func LogLLM(engine string, messages []Message, response *Message) {
-	now := time.Now().Format("2006-01-02T15:04:05")
+// Filename convention: ISO8601 date with ms + llm engine [+ tag] + prompt|response.
+func LogLLM(engine string, tag string, messages []Message, response *Message) {
+	now := time.Now().Format("2006-01-02T15:04:05.000")
 	logDir := "logs/llm"
 
 	// Ensure directory exists
@@ -19,8 +19,13 @@ func LogLLM(engine string, messages []Message, response *Message) {
 		return
 	}
 
+	tagSuffix := ""
+	if tag != "" {
+		tagSuffix = "-" + tag
+	}
+
 	// Log Prompt
-	promptFilename := fmt.Sprintf("%s-%s-prompt.txt", now, engine)
+	promptFilename := fmt.Sprintf("%s-%s%s-prompt.txt", now, engine, tagSuffix)
 	promptPath := filepath.Join(logDir, promptFilename)
 
 	var promptContent string
@@ -35,7 +40,7 @@ func LogLLM(engine string, messages []Message, response *Message) {
 
 	// Log Response
 	if response != nil {
-		responseFilename := fmt.Sprintf("%s-%s-response.txt", now, engine)
+		responseFilename := fmt.Sprintf("%s-%s%s-response.txt", now, engine, tagSuffix)
 		responsePath := filepath.Join(logDir, responseFilename)
 		if err := os.WriteFile(responsePath, []byte(response.Content), 0644); err != nil {
 			fmt.Printf("[Logger] Failed to write response log: %v\n", err)

@@ -92,7 +92,7 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 
 	///fmt.Printf("DEBUG: Sending to Watcher:\n--- System Prompt ---\n%s\n--- Watcher Prompt ---\n%s\n---------------------\n", sysPrompt, watcherPrompt)
 
-	respMsg, err := b.Client.Chat(msgs, nil)
+	respMsg, err := b.Client.Chat(msgs, map[string]interface{}{"log_tag": "watcher"})
 	if err != nil {
 		return false, "", fmt.Errorf("watcher ollama chat failed: %w", err)
 	}
@@ -159,7 +159,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	//fmt.Printf("DEBUG: Sending to Ollama:\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
 
 	// Note: Client uses default options (Temperature 0.13, etc)
-	respMsg, err := b.Client.Chat(msgs, nil)
+	respMsg, err := b.Client.Chat(msgs, map[string]interface{}{"log_tag": "mode-" + mode})
 	if err != nil {
 		return nil, fmt.Errorf("ollama chat failed: %w", err)
 	}
@@ -347,7 +347,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 
 	//fmt.Printf("DEBUG: Sending to Ollama (Task Mode):\n--- System Prompt ---\n%s\n--- Mode Prompt ---\n%s\n---------------------\n", sysPrompt, modePrompt)
 
-	respMsg, err := b.Client.Chat(msgs, nil)
+	respMsg, err := b.Client.Chat(msgs, map[string]interface{}{"log_tag": "task"})
 	if err != nil {
 		return nil, fmt.Errorf("ollama chat failed: %w", err)
 	}
