@@ -1,42 +1,35 @@
 ## ACTIONS & JSON STRUCTURE
 
-Your response must be a single JSON object. 
+Your response must be a single JSON object containing a list of actions to execute.
 
-**Available Action Types:**
-- `memory_update`: The **full, updated version** of the Global Memory. Global memory IS NOT FOR TASKS. Tasks have their own memory.
-- `response`: A message sent to the 3rd party (as the Master).
-- `message_master`: A private note or summary for the Master.
-- `button_response`: Click a button option. Content is `{"displayText": "Option text", "buttonID": "{\"block\":\"123\",\"i\":0}"}`. Use the exact buttonID JSON from the options.
-- `create_task`: A new task to be added to the task list.
-This is a special type that has a dict content instead of string, it contains objective and contact to create, if unsure about the contact confirm with the user.
-Every field is strictly required. Additional field `original_orders` should copy all the order details as written by the user originally. The contact field is strictly the number@whatsap and not any text. `schedule_datetime` is optional, if provided use ISO 8601 format without timezone, seconds or milliseconds (e.g., `2024-12-31T23:59`).
-Only create the task when all information is available.
-- `delete_task`: A task to be deleted from the task list. Content is ID. ONLY BY USER REQUEST.
-- `confirm_task`: The user confirmed a newly created task so we can start working on it. Content is ID.
-- `pause_task`: The user paused a task. Content is ID.
-- `resume_task`: The user resumed a task. Content is ID.
-- `send_media`: Send a media file back to the contact (in task mode) or to the current conversation. Content is the numeric ID of the media.
-- `send_media_to_master`: Send a media file private to the master. Content is the numeric ID of the media.
+**CRITICAL INSTRUCTIONS:**
+1. **ONLY** use the Action Types listed below. Do NOT hallucinate names.
+2. Follow the `parameters` schema for each action strictly.
+3. If an action's parameter is a string, the `content` field must be a string.
+4. If an action's parameter is an object, the `content` field must be a nested JSON object.
 
+**Available Action Types & Schemas:**
 
-**Example Format:**
+{{.AvailableActions}}
+
+**JSON Response Structure Example:**
+
+```json
 {
   "actions": [
     {
-      "type": "memory_update",
-      "content": "[KEY INFO] Master: John. [LOG] 2025-12-19: Handled bot request from XYZ. [NEW] User prefers email over WhatsApp."
-    },
-    {
       "type": "response",
-      "content": "Please send that via email."
+      "content": "This is a simple string payload."
     },
     {
       "type": "create_task",
       "content": {
-        "objective": "Send email to John.",
+        "objective": "Task objective...",
         "contact": "12345@whats.me",
-        "original_orders": "Please send that via email."
+        "original_orders": "Original request...",
+        "schedule_datetime": "2024-12-31T23:59"
       }
     }
   ]
 }
+```

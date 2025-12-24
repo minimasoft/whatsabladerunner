@@ -16,12 +16,13 @@ type SystemData struct {
 }
 
 type ModeData struct {
-	Memories    string
-	Tasks       string // JSON string of active tasks
-	Contacts    string // JSON string
-	Context     string
-	Message     string
-	CurrentTask string // JSON of current task for task mode
+	Memories         string
+	Tasks            string // JSON string of active tasks
+	Contacts         string // JSON string
+	Context          string
+	Message          string
+	CurrentTask      string // JSON of current task for task mode
+	AvailableActions string // JSON schema of available actions
 }
 
 type PromptManager struct {
