@@ -12,7 +12,8 @@ If you configure a **remote LLM provider** (like Cerebras, OpenAI, or any cloud 
 
 - **Every interaction** in self-chat and task-enabled chats is sent to their servers.
 - Even if the provider claims to be trustworthy, there are **no guarantees** they are not collecting, training on, or selling your data to the Tyrell Corporation (or worse).
-- If privacy is your primary directive, this is a risk you are choosing to take. (Here we curated the choice for you: Cerebras has the best chips, pizza sized, and uses models that you can later replicate locally: if you're giving up your data don't give it to the cheaper ones with small chips)
+- If privacy is your primary directive, this is a risk you are choosing to take.
+- We curated the choice for you: Cerebras has the best chips, pizza sized, and uses models that you can later replicate locally. If you're giving up your data don't give it to the lame ones with small chips or private models, don't be so cheap. They also have a generous free quota for every model.
 
 ### 2. The Slow Sanctuary (Local LLMs)
 
