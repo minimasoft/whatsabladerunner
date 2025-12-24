@@ -580,6 +580,9 @@ func eventHandler(evt interface{}) {
 			fmt.Printf("Received History Sync (Type: %s)\n", id)
 
 			for _, conv := range v.Data.GetConversations() {
+				/* if i == 0 {
+					fmt.Printf("DEBUG: Sample Conversation during HistorySync: %+v\n", conv)
+				} */
 				chatJID := conv.GetID()
 				for _, msg := range conv.GetMessages() {
 					// history sync messages are wrapped in WebMessageInfo, we need to extract the actual message content
@@ -961,10 +964,10 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	// List stored conversations after a short delay to allow connection/store readiness
-	go func() {
+	/*go func() {
 		time.Sleep(3 * time.Second)
 		listStoredConversations(client)
-	}()
+	}()*/
 
 	// Start Ticker
 	go startScheduledTasksTicker()
@@ -1001,37 +1004,6 @@ func startScheduledTasksTicker() {
 func listStoredConversations(client *whatsmeow.Client) {
 	fmt.Println("Fetching stored conversations...")
 
-	// List Groups
-	groups, err := client.GetJoinedGroups(context.Background())
-	if err != nil {
-		fmt.Println("Failed to get groups:", err)
-	} else {
-		fmt.Println("Groups:")
-		for _, g := range groups {
-			fmt.Printf("- %s (%s)\n", g.Name, g.JID)
-			fmt.Println("  Participants:")
-			for _, p := range g.Participants {
-				fmt.Printf("    - %s\n", p.JID)
-			}
-
-			// Check chat settings
-			if client.Store.ChatSettings != nil {
-				settings, err := client.Store.ChatSettings.GetChatSettings(context.Background(), g.JID)
-				if err == nil {
-					if settings.MutedUntil.After(time.Now()) {
-						fmt.Println("  [MUTED]")
-					}
-					if settings.Pinned {
-						fmt.Println("  [PINNED]")
-					}
-					if settings.Archived {
-						fmt.Println("  [ARCHIVED]")
-					}
-				}
-			}
-		}
-	}
-
 	// List Contacts
 	if client.Store.Contacts != nil {
 		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
@@ -1051,6 +1023,7 @@ func listStoredConversations(client *whatsmeow.Client) {
 					name = "Unknown"
 				}
 				fmt.Printf("- %s (%s)\n", name, jid)
+				// fmt.Printf(" [ContactDetail]: %+v\n", info)
 
 				// Check chat settings
 				if client.Store.ChatSettings != nil {
@@ -1068,6 +1041,15 @@ func listStoredConversations(client *whatsmeow.Client) {
 					}
 				}
 			}
+			// Also list groups for more info
+			groups, err := client.GetJoinedGroups(context.Background())
+			if err == nil {
+				fmt.Println("Groups:")
+				for _, g := range groups {
+					fmt.Printf("- %s (%s)\n", g.Name, g.JID.String())
+					// fmt.Printf("  [GroupDetail]: %+v\n", g)
+				}
+			}
 		}
 	} else {
 		fmt.Println("Contact store not available")
@@ -1075,8 +1057,13 @@ func listStoredConversations(client *whatsmeow.Client) {
 }
 
 type ContactEntry struct {
-	Name   string `json:"name"`
-	Number string `json:"number"`
+	Number       string `json:"num"`
+	PushName     string `json:"pub_name,omitempty"`
+	FullName     string `json:"set_name,omitempty"`
+	BusinessName string `json:"business,omitempty"`
+	Type         string `json:"type,omitempty"`
+	Topic        string `json:"topic,omitempty"`
+	Name         string `json:"name,omitempty"` // For groups
 }
 
 func getAllContactsJSON(client *whatsmeow.Client) string {
@@ -1089,6 +1076,8 @@ func getAllContactsJSON(client *whatsmeow.Client) string {
 			contacts = append(contacts, ContactEntry{
 				Name:   g.Name,
 				Number: g.JID.String(),
+				Type:   "group",
+				Topic:  g.Topic,
 			})
 		}
 	}
@@ -1098,19 +1087,12 @@ func getAllContactsJSON(client *whatsmeow.Client) string {
 		allContacts, err := client.Store.Contacts.GetAllContacts(context.Background())
 		if err == nil {
 			for jid, info := range allContacts {
-				name := info.PushName
-				if name == "" {
-					name = info.FullName
-				}
-				if name == "" {
-					name = info.BusinessName
-				}
-				if name == "" {
-					name = "Unknown"
-				}
 				contacts = append(contacts, ContactEntry{
-					Name:   name,
-					Number: jid.String(),
+					Number:       jid.String(),
+					PushName:     info.PushName,
+					FullName:     info.FullName,
+					BusinessName: info.BusinessName,
+					Type:         "contact",
 				})
 			}
 		}
