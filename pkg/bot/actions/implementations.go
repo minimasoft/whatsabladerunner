@@ -18,7 +18,7 @@ type MemoryUpdateAction struct {
 func (a *MemoryUpdateAction) GetSchema() ActionSchema {
 	return ActionSchema{
 		Name:        "memory_update",
-		Description: "The **full, updated version** of the Global Memory. Global memory IS NOT FOR TASKS.",
+		Description: "The **full, updated version** of the Global Memory. Use this ONLY to REWRITE the entire memory. For adding lines, use memory_append. Global memory IS NOT FOR TASKS.",
 		Parameters:  json.RawMessage(`{"type": "string", "description": "The full memory text."}`),
 	}
 }
@@ -36,6 +36,52 @@ func (a *MemoryUpdateAction) Execute(ctx ActionContext, payload json.RawMessage)
 		return fmt.Errorf("failed to write memories: %w", err)
 	}
 	fmt.Println("Memories updated.")
+	return nil
+}
+
+// --- MemoryAppendAction ---
+
+type MemoryAppendAction struct {
+	MemoriesPath string
+}
+
+func (a *MemoryAppendAction) GetSchema() ActionSchema {
+	return ActionSchema{
+		Name:        "memory_append",
+		Description: "Append a new line or lines to the Global Memory. Use this for incremental updates. Global memory IS NOT FOR TASKS.",
+		Parameters:  json.RawMessage(`{"type": "string", "description": "The text to append."}`),
+	}
+}
+
+func (a *MemoryAppendAction) Execute(ctx ActionContext, payload json.RawMessage) error {
+	var contentStr string
+	if err := json.Unmarshal(payload, &contentStr); err != nil {
+		return fmt.Errorf("invalid payload for memory_append: %w", err)
+	}
+
+	f, err := os.OpenFile(a.MemoriesPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open memories for append: %w", err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat memories file: %w", err)
+	}
+
+	// Add a newline if file is not empty and doesn't end with one
+	if info.Size() > 0 {
+		if _, err := f.WriteString("\n"); err != nil {
+			return fmt.Errorf("failed to write newline to memories: %w", err)
+		}
+	}
+
+	if _, err := f.WriteString(contentStr); err != nil {
+		return fmt.Errorf("failed to append to memories: %w", err)
+	}
+
+	fmt.Println("Memories appended.")
 	return nil
 }
 

@@ -51,8 +51,11 @@ func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMast
 }
 
 func (b *Bot) registerActions() {
-	// Memory Update
+	// Memory Update & Append
 	b.ActionRegistry.Register(&actions.MemoryUpdateAction{
+		MemoriesPath: filepath.Join(b.ConfigDir, "memories.txt"),
+	})
+	b.ActionRegistry.Register(&actions.MemoryAppendAction{
 		MemoriesPath: filepath.Join(b.ConfigDir, "memories.txt"),
 	})
 
