@@ -29,6 +29,7 @@ The project is structured as a Go application with various internal packages loc
 - **Purpose**: Processes messages using LLMs and translates intent into executable actions.
 - **Main Types**: `Bot` (main processor), `BotResponse` (processed LLM output).
 - **Core Logic**: `Process` (general chat) and `ProcessTask` (focused agent work).
+- **Security**: Prompts in `config/modes/` incorporate injection guards and bot-suspicion awareness to maintain persona integrity.
 
 #### [`pkg/bot/actions`](./pkg/bot/actions)
 
