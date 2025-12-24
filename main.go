@@ -234,6 +234,7 @@ func eventHandler(evt interface{}) {
 						SenderJID: v.Info.Sender.String(),
 						MediaType: mtype,
 						MimeType:  mimetype,
+						Filename:  ext, // Store extension in Filename field
 						Timestamp: v.Info.Timestamp,
 					})
 
@@ -710,6 +711,7 @@ func main() {
 		}
 	}
 	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client))
+	taskBot.SendMediaFunc = sendMedia
 
 	// Set up OnWatcherBlock callback to store withheld messages for LET IT BE override
 	taskBot.OnWatcherBlock = func(blockedMsg string, targetChatID string, sendFunc func(string)) {
@@ -1128,5 +1130,122 @@ func reinitLLM(notifyJID types.JID) {
 				}
 			}
 		}()
+	}
+}
+
+func sendMedia(chatJID string, mediaID int64) {
+	if whatsAppClient == nil {
+		return
+	}
+
+	info, err := historyStore.GetMedia(mediaID)
+	if err != nil || info == nil {
+		fmt.Printf("Failed to get media info for ID %d: %v\n", mediaID, err)
+		return
+	}
+
+	var target types.JID
+	if chatJID == "master" || chatJID == "" {
+		if whatsAppClient.Store.ID == nil {
+			return
+		}
+		target = whatsAppClient.Store.ID.ToNonAD()
+	} else {
+		target, err = types.ParseJID(chatJID)
+		if err != nil {
+			fmt.Printf("Failed to parse JID %s: %v\n", chatJID, err)
+			return
+		}
+	}
+
+	// Determine file path
+	ext := info.Filename
+	if ext == "" {
+		// Fallback for already stored media without extension in DB
+		ext = "bin"
+		if info.MediaType == "image" {
+			ext = "jpg"
+		} else if info.MediaType == "video" {
+			ext = "mp4"
+		} else if info.MediaType == "audio" {
+			ext = "ogg"
+		}
+	}
+
+	dir := filepath.Join("plain_media", info.MediaType)
+	filePath := filepath.Join(dir, fmt.Sprintf("%d.%s", mediaID, ext))
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Printf("Failed to read media file %s: %v\n", filePath, err)
+		return
+	}
+
+	var mtype whatsmeow.MediaType
+	switch info.MediaType {
+	case "image":
+		mtype = whatsmeow.MediaImage
+	case "video":
+		mtype = whatsmeow.MediaVideo
+	case "audio":
+		mtype = whatsmeow.MediaAudio
+	default:
+		mtype = whatsmeow.MediaDocument
+	}
+
+	resp, err := whatsAppClient.Upload(context.Background(), data, mtype)
+	if err != nil {
+		fmt.Printf("Failed to upload media: %v\n", err)
+		return
+	}
+
+	msg := &waProto.Message{}
+	switch info.MediaType {
+	case "image":
+		msg.ImageMessage = &waProto.ImageMessage{
+			URL:           proto.String(resp.URL),
+			DirectPath:    proto.String(resp.DirectPath),
+			MediaKey:      resp.MediaKey,
+			Mimetype:      proto.String(info.MimeType),
+			FileEncSHA256: resp.FileEncSHA256,
+			FileSHA256:    resp.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(data))),
+		}
+	case "video":
+		msg.VideoMessage = &waProto.VideoMessage{
+			URL:           proto.String(resp.URL),
+			DirectPath:    proto.String(resp.DirectPath),
+			MediaKey:      resp.MediaKey,
+			Mimetype:      proto.String(info.MimeType),
+			FileEncSHA256: resp.FileEncSHA256,
+			FileSHA256:    resp.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(data))),
+		}
+	case "audio":
+		msg.AudioMessage = &waProto.AudioMessage{
+			URL:           proto.String(resp.URL),
+			DirectPath:    proto.String(resp.DirectPath),
+			MediaKey:      resp.MediaKey,
+			Mimetype:      proto.String(info.MimeType),
+			FileEncSHA256: resp.FileEncSHA256,
+			FileSHA256:    resp.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(data))),
+		}
+	default:
+		msg.DocumentMessage = &waProto.DocumentMessage{
+			URL:           proto.String(resp.URL),
+			DirectPath:    proto.String(resp.DirectPath),
+			MediaKey:      resp.MediaKey,
+			Mimetype:      proto.String(info.MimeType),
+			FileEncSHA256: resp.FileEncSHA256,
+			FileSHA256:    resp.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(data))),
+		}
+	}
+
+	_, err = whatsAppClient.SendMessage(context.Background(), target, msg)
+	if err != nil {
+		fmt.Printf("Failed to send media message to %s: %v\n", target, err)
+	} else {
+		fmt.Printf("Media %d sent to %s\n", mediaID, target)
 	}
 }

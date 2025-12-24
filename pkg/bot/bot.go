@@ -20,9 +20,10 @@ type Bot struct {
 
 	SendFunc               func(string)
 	SendMasterFunc         func(string)
-	SendButtonResponseFunc func(displayText, buttonID string) // For sending button responses
-	Contacts               string                             // JSON formatted string of contacts
-	StartTaskCallback      func(*tasks.Task)                  // Called when a task is confirmed to start it
+	SendButtonResponseFunc func(displayText, buttonID string)  // For sending button responses
+	SendMediaFunc          func(chatJID string, mediaID int64) // For sending media back
+	Contacts               string                              // JSON formatted string of contacts
+	StartTaskCallback      func(*tasks.Task)                   // Called when a task is confirmed to start it
 
 	// OnWatcherBlock is called when watcher blocks a message, allowing the caller to store it for potential override
 	OnWatcherBlock func(blockedMsg string, targetChatJID string, sendFunc func(string))
@@ -294,6 +295,38 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 				fmt.Printf("Failed to resume task %d: %v\n", id, err)
 			}
 
+		case "send_media":
+			id, err := strconv.ParseInt(contentStr, 10, 64)
+			if err != nil {
+				fmt.Printf("Failed to parse send_media ID: %v\n", err)
+				continue
+			}
+			if b.SendMediaFunc != nil {
+				// In command mode, if we don't have a specific contact, where do we send it?
+				// User says "references by id and 'send_media_to_master' for master messages".
+				// If LLM says "send_media" without context, we might need to assume it's replying to the current conversation.
+				// For Note-to-Self, SendFunc sends to the master.
+				// Let's assume send_media sends to the "primary" chat of the context.
+				// In Process, this is tricky as there isn't a single 'contactJID' like in ProcessTask.
+				// However, if we are in Note-to-Self, we can send to master.
+				// For now, let's just use SendMediaFunc and let the implementation decide or provide a default.
+				// Actually, the user request says: "It references by id and 'send_media_to_master' for master messages."
+				// So if it's send_media, it probably means "to the user I'm talking to".
+				// I'll add a way to pass the target JID if possible, or use a default.
+				// Since Process doesn't have a chatJID, I'll pass empty for now or let the implementation handle it.
+				b.SendMediaFunc("", id)
+			}
+
+		case "send_media_to_master":
+			id, err := strconv.ParseInt(contentStr, 10, 64)
+			if err != nil {
+				fmt.Printf("Failed to parse send_media_to_master ID: %v\n", err)
+				continue
+			}
+			if b.SendMediaFunc != nil {
+				b.SendMediaFunc("master", id)
+			}
+
 		default:
 			fmt.Printf("Unknown action type: %s\n", rawAction.Type)
 		}
@@ -452,6 +485,26 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 				if err := b.TaskManager.SetTaskRunning(task.ID); err != nil {
 					fmt.Printf("Failed to set task running: %v\n", err)
 				}
+			}
+
+		case "send_media":
+			id, err := strconv.ParseInt(contentStr, 10, 64)
+			if err != nil {
+				fmt.Printf("Failed to parse send_media ID: %v\n", err)
+				continue
+			}
+			if b.SendMediaFunc != nil {
+				b.SendMediaFunc(task.ChatID, id)
+			}
+
+		case "send_media_to_master":
+			id, err := strconv.ParseInt(contentStr, 10, 64)
+			if err != nil {
+				fmt.Printf("Failed to parse send_media_to_master ID: %v\n", err)
+				continue
+			}
+			if b.SendMediaFunc != nil {
+				b.SendMediaFunc("master", id)
 			}
 
 		default:
