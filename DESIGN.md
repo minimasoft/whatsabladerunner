@@ -1,6 +1,7 @@
 # Whatsabladerunner Design
 
 ## TL;DR
+
 It is a bot that you command via WhatsApp self-chat, allowing the bot to speak on your behalf in other conversations.
 
 ## Code

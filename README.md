@@ -30,7 +30,7 @@ A: All of it is lost, like tears in rain.
 
 If you are new to **whatsabladerunner**, you should check out these documents:
 
-- [Installation Guide](INSTALL.md)
-- [Safety & Privacy](SAFETY.md)
-- [Design Principles](DESIGN.md)
-- [Code Overview](CODE.md)
+- 🚀 [Installation Guide](INSTALL.md)
+- 🛡️ [Safety & Privacy](SAFETY.md)
+- 🎨 [Design Principles](DESIGN.md)
+- 📖 [Code Overview](CODE.md)
