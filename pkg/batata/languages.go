@@ -180,6 +180,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Blady के दिमाग में त्रुटि: %s",
 		BrainErrorSuggest:     "ℹ️ फिर से कॉन्फ़िगर करने के लिए 'Batata help' कहें।",
 		MediaStored:           "📦 मीडिया संग्रहीत: %s (ID: %d)",
+		TaskDeleted:           "🗑️ कार्य %d हटा दिया गया।",
+		TaskPaused:            "⏸️ कार्य %d रोक दिया गया।",
+		TaskResumed:           "▶️ कार्य %d फिर से शुरू किया गया।",
 	},
 	LangPortuguese: {
 		Intro:                 "🥔 Olá! Sou o Batata, o núcleo simples que cuida da infraestrutura básica do Blady. Vamos configurar tudo!",
@@ -210,6 +213,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Erro no cérebro do Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Diga 'Batata help' para reconfigurar.",
 		MediaStored:           "📦 Mídia armazenada: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Tarefa %d excluída.",
+		TaskPaused:            "⏸️ Tarefa %d pausada.",
+		TaskResumed:           "▶️ Tarefa %d retomada.",
 	},
 	LangBengali: {
 		Intro:                 "🥔 এটি Batata, একটি কম-প্রচেষ্টার সরল কোর যা whatsabladerunner-এর প্রধান Blady কোরের জন্য মৌলিক অবকাঠামো পরিচালনা করে। মৌলিক কনফিগারেশন অনুসরণ করবে।",
@@ -240,6 +246,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Blady-এর মস্তিষ্কে ত্রুটি: %s",
 		BrainErrorSuggest:     "ℹ️ পুনরায় কনফিগার করতে 'Batata help' বলুন।",
 		MediaStored:           "📦 মিডিয়া সংরক্ষিত: %s (ID: %d)",
+		TaskDeleted:           "🗑️ টাস্ক %d মুছে ফেলা হয়েছে।",
+		TaskPaused:            "⏸️ টাস্ক %d স্থগিত করা হয়েছে।",
+		TaskResumed:           "▶️ টাস্ক %d পুনরায় শুরু করা হয়েছে।",
 	},
 	LangRussian: {
 		Intro:                 "🥔 Привет! Я Batata, простое ядро, которое управляет базовой инфраструктурой Blady. Давайте всё настроим!",
@@ -270,6 +279,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Ошибка мозга Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Скажите 'Batata help' для перенастройки.",
 		MediaStored:           "📦 Медиа сохранено: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Задача %d удалена.",
+		TaskPaused:            "⏸️ Задача %d приостановлена.",
+		TaskResumed:           "▶️ Задача %d возобновлена.",
 	},
 	LangJapanese: {
 		Intro:                 "🥔 こんにちは！私はBatataです。Bladyの基本インフラを担当するシンプルなコアです。設定を始めましょう！",
@@ -300,6 +312,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Bladyの脳エラー: %s",
 		BrainErrorSuggest:     "ℹ️ 設定をやり直すには 'Batata help' と言ってください。",
 		MediaStored:           "📦 メディアが保存されました: %s (ID: %d)",
+		TaskDeleted:           "🗑️ タスク %d が削除されました。",
+		TaskPaused:            "⏸️ タスク %d が一時停止されました。",
+		TaskResumed:           "▶️ タスク %d が再開されました。",
 	},
 	LangPunjabi: {
 		Intro:                 "🥔 ਇਹ Batata ਹੈ, ਇੱਕ ਘੱਟ-ਮਿਹਨਤ ਵਾਲਾ ਸਧਾਰਨ ਕੋਰ ਜੋ whatsabladerunner ਦੇ ਮੁੱਖ Blady ਕੋਰ ਲਈ ਬੁਨਿਆਦੀ ਢਾਂਚੇ ਦਾ ਧਿਆਨ ਰੱਖਦਾ ਹੈ। ਬੁਨਿਆਦੀ ਸੰਰਚਨਾ ਅੱਗੇ ਹੋਵੇਗੀ।",
@@ -330,6 +345,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Blady ਦੇ ਦਿਮਾਗ ਵਿੱਚ ਗਲਤੀ: %s",
 		BrainErrorSuggest:     "ℹ️ ਮੁੜ-ਸੰਰਚਨਾ ਲਈ 'Batata help' ਕਹੋ।",
 		MediaStored:           "📦 ਮੀਡੀਆ ਸਟੋਰ ਕੀਤਾ ਗਿਆ: %s (ID: %d)",
+		TaskDeleted:           "🗑️ ਕੰਮ %d ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ।",
+		TaskPaused:            "⏸️ ਕੰਮ %d ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
+		TaskResumed:           "▶️ ਕੰਮ %d ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ।",
 	},
 	LangVietnamese: {
 		Intro:                 "🥔 Đây là Batata, lõi đơn giản ít nỗ lực chịu trách nhiệm về cơ sở hạ tầng cơ bản cho lõi Blady chính của whatsabladerunner. Cấu hình cơ bản sẽ theo sau.",
@@ -360,6 +378,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Lỗi với não của Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Nói 'Batata help' để cấu hình lại.",
 		MediaStored:           "📦 Phương tiện đã lưu: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Nhiệm vụ %d đã bị xóa.",
+		TaskPaused:            "⏸️ Nhiệm vụ %d đã bị tạm dừng.",
+		TaskResumed:           "▶️ Nhiệm vụ %d đã được tiếp tục.",
 	},
 	LangGerman: {
 		Intro:                 "🥔 Hey! Ich bin Batata, der einfache Kern, der die grundlegende Infrastruktur für Blady verwaltet. Lass uns alles einrichten!",
@@ -390,6 +411,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Fehler mit Bladys Gehirn: %s",
 		BrainErrorSuggest:     "ℹ️ Sag 'Batata help', um neu zu konfigurieren.",
 		MediaStored:           "📦 Medien gespeichert: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Aufgabe %d gelöscht.",
+		TaskPaused:            "⏸️ Aufgabe %d pausiert.",
+		TaskResumed:           "▶️ Aufgabe %d fortgesetzt.",
 	},
 	LangFrench: {
 		Intro:                 "🥔 Salut ! Je suis Batata, le noyau simple qui gère l'infrastructure de base pour Blady. Configurons tout ça !",
@@ -420,6 +444,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Erreur avec le cerveau de Blady : %s",
 		BrainErrorSuggest:     "ℹ️ Dites 'Batata help' pour reconfigurer.",
 		MediaStored:           "📦 Média stocké : %s (ID: %d)",
+		TaskDeleted:           "🗑️ Tâche %d supprimée.",
+		TaskPaused:            "⏸️ Tâche %d suspendue.",
+		TaskResumed:           "▶️ Tâche %d reprise.",
 	},
 	LangItalian: {
 		Intro:                 "🥔 Ciao! Sono Batata, il nucleo semplice che gestisce l'infrastruttura di base per Blady. Configuriamo tutto!",
@@ -449,6 +476,9 @@ var LangStrings = map[Language]Strings{
 		InvalidCerebrasKey:    "❌ API key troppo corta (min 20 caratteri). Torno indietro...",
 		BrainError:            "⚠️ Errore con il cervello di Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Di' 'Batata help' per riconfigurare.",
+		TaskDeleted:           "🗑️ Attività %d eliminata.",
+		TaskPaused:            "⏸️ Attività %d in pausa.",
+		TaskResumed:           "▶️ Attività %d ripresa.",
 	},
 	LangArabic: {
 		Intro:                 "🥔 مرحبًا! أنا Batata، النواة البسيطة التي تدير البنية التحتية الأساسية لـ Blady. دعنا نقم بإعداد كل شيء!",
@@ -479,6 +509,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ خطأ في دماغ Blady: %s",
 		BrainErrorSuggest:     "ℹ️ قل 'Batata help' لإعادة التكوين.",
 		MediaStored:           "📦 تم تخزين الوسائط: %s (ID: %d)",
+		TaskDeleted:           "🗑️ تم حذف المهمة %d.",
+		TaskPaused:            "⏸️ تم إيقاف المهمة %d مؤقتًا.",
+		TaskResumed:           "▶️ تم استئناف المهمة %d.",
 	},
 	LangTurkish: {
 		Intro:                 "🥔 Merhaba! Ben Batata, Blady için temel altyapıyı yöneten basit çekirdeğim. Hadi her şeyi ayarlayalım!",
@@ -509,6 +542,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Blady'nin beyninde hata: %s",
 		BrainErrorSuggest:     "ℹ️ Yeniden yapılandırmak için 'Batata help' deyin.",
 		MediaStored:           "📦 Medya kaydedildi: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Görev %d silindi.",
+		TaskPaused:            "⏸️ Görev %d duraklatıldı.",
+		TaskResumed:           "▶️ Görev %d devam ettirildi.",
 	},
 	LangIndonesian: {
 		Intro:                 "🥔 Halo! Saya Batata, core sederhana yang menangani infrastruktur dasar untuk Blady. Ayo siapkan semuanya!",
@@ -539,6 +575,9 @@ var LangStrings = map[Language]Strings{
 		BrainError:            "⚠️ Kesalahan pada otak Blady: %s",
 		BrainErrorSuggest:     "ℹ️ Ucapkan 'Batata help' untuk mengonfigurasi ulang.",
 		MediaStored:           "📦 Media disimpan: %s (ID: %d)",
+		TaskDeleted:           "🗑️ Tugas %d dihapus.",
+		TaskPaused:            "⏸️ Tugas %d dijeda.",
+		TaskResumed:           "▶️ Tugas %d dilanjutkan.",
 	},
 }
 
