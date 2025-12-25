@@ -1,0 +1,14 @@
+services:
+  whatsabladerunner:
+    build: .
+    container_name: whatsabladerunner
+    restart: unless-stopped
+    stdin_open: true # Required for interactive terminal/QR code
+    tty: true # Required for interactive terminal/QR code
+    volumes:
+      - ./data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
