@@ -1,6 +1,8 @@
 # [WIP] ETA: 25/12/25
 # whatsabladerunner
 
+🌐 [English](README.md) | 🇦🇷 [Español](docs/README-es.md) | 🇧🇷 [Português](docs/README-pt.md)
+
 > "I've seen things you people wouldn't believe. Humans talking for hours to matrix multiplications..."
 
 A **whatsabladerunner** is a special ~~police officer~~ *pig bot* tasked with hunting down and "retiring" your interactions with commercial bots on WhatsApp.

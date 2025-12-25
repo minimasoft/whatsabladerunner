@@ -129,6 +129,12 @@ func (b *Bot) registerActions() {
 		SendButtonResponseFunc: b.SendButtonResponseFunc,
 		TaskManager:            b.TaskManager,
 	})
+
+	// Custom Actions
+	actionsDir := filepath.Join(b.ConfigDir, "actions")
+	if err := actions.LoadCustomActions(actionsDir, b.ActionRegistry); err != nil {
+		fmt.Printf("Error loading custom actions: %v\n", err)
+	}
 }
 
 // RawAction is used for initial parsing to handle flexible content types
