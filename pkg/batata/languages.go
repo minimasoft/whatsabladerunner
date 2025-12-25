@@ -41,104 +41,107 @@ var SupportedLanguages = []string{
 }
 
 type Strings struct {
-	Intro                  string
-	ChooseLLM              string
-	LLMOptions             string
-	OllamaConfig           string
-	CerebrasConfig         string
-	CerebrasKey            string
-	CerebrasModel          string
-	OllamaHost             string
-	OllamaPort             string
-	OllamaModel            string
-	ConfigSaved            string
-	MenuTitle              string
-	MenuOptions            string
-	KillGoodbye            string
-	InvalidInput           string
-	BackToBlady            string
-	MiscConfig             string
-	SetBrain               string
-	BrainOffline           string
-	InvalidLanguageChoice  string
-	BrainSetOllama         string
-	BrainSetCerebras       string
-	BrainSetNone           string
-	BladyRunning           string
-	InvalidCerebrasKey     string
-	BrainError             string
-	BrainErrorSuggest      string
-	MediaStored            string
-	TranscriptionConfig    string
-	TranscriptionServerURL string
-	TranscriptionSaved     string
+	Intro                    string
+	ChooseLLM                string
+	LLMOptions               string
+	OllamaConfig             string
+	CerebrasConfig           string
+	CerebrasKey              string
+	CerebrasModel            string
+	OllamaHost               string
+	OllamaPort               string
+	OllamaModel              string
+	ConfigSaved              string
+	MenuTitle                string
+	MenuOptions              string
+	KillGoodbye              string
+	InvalidInput             string
+	BackToBlady              string
+	MiscConfig               string
+	SetBrain                 string
+	BrainOffline             string
+	InvalidLanguageChoice    string
+	BrainSetOllama           string
+	BrainSetCerebras         string
+	BrainSetNone             string
+	BladyRunning             string
+	InvalidCerebrasKey       string
+	BrainError               string
+	BrainErrorSuggest        string
+	MediaStored              string
+	TranscriptionConfig      string
+	TranscriptionServerURL   string
+	TranscriptionSaved       string
+	TranscriptionSetupPrompt string
 }
 
 var LangStrings = map[Language]Strings{
 	LangSpanish: {
-		Intro:                  "🥔 ¡Hola! Soy Batata, el núcleo tonto que maneja la infraestructura básica de Blady. ¡Configuremos todo!",
-		ChooseLLM:              "🤖 ¿Qué motor LLM?",
-		LLMOptions:             "1. Ollama\n2. Cerebras\n3. Ninguno",
-		OllamaConfig:           "⚙️ Configurando Ollama...",
-		CerebrasConfig:         "☁️ Configurando Cerebras. Nota: Los contactos y mensajes se enviarán a Cerebras.",
-		CerebrasKey:            "🔑 Ingresa tu API Key de Cerebras (cuota gratis disponible):",
-		CerebrasModel:          "🤖 Elige el Modelo de Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
-		OllamaHost:             "🌐 Ingresa el Host de Ollama (IP/URL):",
-		OllamaPort:             "🔌 Ingresa el Puerto de Ollama (default 11434):",
-		OllamaModel:            "🤖 Ingresa el Modelo de Ollama (sugerido: gpt-oss:20b o qwen30b+):",
-		ConfigSaved:            "✅ ¡Batata configurada! Di 'Batata help' cuando quieras cambiar algo.",
-		MenuTitle:              "🥔 Menú Batata",
-		MenuOptions:            "1. 🌍 Cambiar idioma\n2. ⚙️ Config LLM\n3. 🧠 Cerebro de Blady\n4. 🎙️ Config Transcripción\n5. ☠️ Matar app\n6. 👋 Volver a Blady",
-		KillGoodbye:            "☠️ Matando whatsabladerunner... ¡Chau!",
-		InvalidInput:           "❌ Entrada inválida, intenta de nuevo.",
-		BackToBlady:            "👋 ¡Devolviendo control a Blady!",
-		MiscConfig:             "🔧 Config misc no implementada aún.",
-		SetBrain:               "🧠 Elige LLM para el cerebro de Blady:",
-		BrainOffline:           "⚠️ El cerebro de Blady está OFFLINE. Solo Batata disponible.",
-		InvalidLanguageChoice:  "❌",
-		BrainSetOllama:         "🧠 ¡Cerebro configurado a Ollama!",
-		BrainSetCerebras:       "🧠 ¡Cerebro configurado a Cerebras!",
-		BrainSetNone:           "🧠 Cerebro configurado a Ninguno (Offline).",
-		BladyRunning:           "🤖 Blady ya está funcionando con el proveedor %s y el modelo: %s.",
-		InvalidCerebrasKey:     "❌ API key demasiado corta (min 20 chars). Volviendo...",
-		BrainError:             "⚠️ Error con el cerebro de Blady: %s",
-		BrainErrorSuggest:      "ℹ️ Di 'Batata help' para re-configurar.",
-		MediaStored:            "📦 Media guardada: %s (ID: %d)",
-		TranscriptionConfig:    "🎙️ Configuración de Transcripción",
-		TranscriptionServerURL: "🌐 Ingresa URL del servidor de transcripción (ej: http://localhost:8000/v1):",
-		TranscriptionSaved:     "✅ ¡Transcripción configurada!"},
+		Intro:                    "🥔 ¡Hola! Soy Batata, el núcleo tonto que maneja la infraestructura básica de Blady. ¡Configuremos todo!",
+		ChooseLLM:                "🤖 ¿Qué motor LLM?",
+		LLMOptions:               "1. Ollama\n2. Cerebras\n3. Ninguno",
+		OllamaConfig:             "⚙️ Configurando Ollama...",
+		CerebrasConfig:           "☁️ Configurando Cerebras. Nota: Los contactos y mensajes se enviarán a Cerebras.",
+		CerebrasKey:              "🔑 Ingresa tu API Key de Cerebras (cuota gratis disponible):",
+		CerebrasModel:            "🤖 Elige el Modelo de Cerebras:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
+		OllamaHost:               "🌐 Ingresa el Host de Ollama (IP/URL):",
+		OllamaPort:               "🔌 Ingresa el Puerto de Ollama (default 11434):",
+		OllamaModel:              "🤖 Ingresa el Modelo de Ollama (sugerido: gpt-oss:20b o qwen30b+):",
+		ConfigSaved:              "✅ ¡Batata configurada! Di 'Batata help' cuando quieras cambiar algo.",
+		MenuTitle:                "🥔 Menú Batata",
+		MenuOptions:              "1. 🌍 Cambiar idioma\n2. ⚙️ Config LLM\n3. 🧠 Cerebro de Blady\n4. 🎙️ Config Transcripción\n5. ☠️ Matar app\n6. 👋 Volver a Blady",
+		KillGoodbye:              "☠️ Matando whatsabladerunner... ¡Chau!",
+		InvalidInput:             "❌ Entrada inválida, intenta de nuevo.",
+		BackToBlady:              "👋 ¡Devolviendo control a Blady!",
+		MiscConfig:               "🔧 Config misc no implementada aún.",
+		SetBrain:                 "🧠 Elige LLM para el cerebro de Blady:",
+		BrainOffline:             "⚠️ El cerebro de Blady está OFFLINE. Solo Batata disponible.",
+		InvalidLanguageChoice:    "❌",
+		BrainSetOllama:           "🧠 ¡Cerebro configurado a Ollama!",
+		BrainSetCerebras:         "🧠 ¡Cerebro configurado a Cerebras!",
+		BrainSetNone:             "🧠 Cerebro configurado a Ninguno (Offline).",
+		BladyRunning:             "🤖 Blady ya está funcionando con el proveedor %s y el modelo: %s.",
+		InvalidCerebrasKey:       "❌ API key demasiado corta (min 20 chars). Volviendo...",
+		BrainError:               "⚠️ Error con el cerebro de Blady: %s",
+		BrainErrorSuggest:        "ℹ️ Di 'Batata help' para re-configurar.",
+		MediaStored:              "📦 Media guardada: %s (ID: %d)",
+		TranscriptionConfig:      "🎙️ Configuración de Transcripción",
+		TranscriptionServerURL:   "🌐 Ingresa URL del servidor de transcripción (ej: http://localhost:8000/v1):",
+		TranscriptionSaved:       "✅ ¡Transcripción configurada!",
+		TranscriptionSetupPrompt: "🎙️ ¿Configurar servidor de transcripción? (s/n)"},
 	LangEnglish: {
-		Intro:                  "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
-		ChooseLLM:              "🤖 Which LLM engine?",
-		LLMOptions:             "1. Ollama\n2. Cerebras\n3. None",
-		OllamaConfig:           "⚙️ Configuring Ollama...",
-		CerebrasConfig:         "☁️ Configuring Cerebras. Note: Contact info and messages will be sent to Cerebras.",
-		CerebrasKey:            "🔑 Enter your Cerebras API Key (free quota available):",
-		CerebrasModel:          "🤖 Choose Cerebras Model:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
-		OllamaHost:             "🌐 Enter Ollama Host (IP/URL):",
-		OllamaPort:             "🔌 Enter Ollama Port (default 11434):",
-		OllamaModel:            "🤖 Enter Ollama Model (suggested: gpt-oss:20b or qwen30b+):",
-		ConfigSaved:            "✅ Batata configured! Say 'Batata help' anytime to change settings.",
-		MenuTitle:              "🥔 Batata Menu",
-		MenuOptions:            "1. 🌍 Change language\n2. ⚙️ Update LLM config\n3. 🧠 Set Blady's brain\n4. 🎙️ Transcription Config\n5. ☠️ Kill app\n6. 👋 Back to Blady",
-		KillGoodbye:            "☠️ Killing whatsabladerunner... Bye!",
-		InvalidInput:           "❌ Invalid input, try again.",
-		BackToBlady:            "👋 Returning control to Blady!",
-		MiscConfig:             "🔧 Misc config not implemented yet.",
-		SetBrain:               "🧠 Pick LLM for Blady's brain:",
-		BrainOffline:           "⚠️ Blady's brain is OFFLINE. Only Batata interactions available.",
-		InvalidLanguageChoice:  "❌",
-		BrainSetOllama:         "🧠 Brain set to Ollama!",
-		BrainSetCerebras:       "🧠 Brain set to Cerebras!",
-		BrainSetNone:           "🧠 Brain set to None (Offline).",
-		BladyRunning:           "🤖 Blady is now running with provider %s and model: %s.",
-		InvalidCerebrasKey:     "❌ API key too short (min 20 chars). Going back...",
-		BrainError:             "⚠️ Error with Blady's brain: %s",
-		BrainErrorSuggest:      "ℹ️ Say 'Batata help' to re-configure.",
-		MediaStored:            "📦 Media stored: %s (ID: %d)",
-		TranscriptionConfig:    "🎙️ Transcription Configuration",
-		TranscriptionServerURL: "🌐 Enter Transcription Server URL (e.g. http://localhost:8000/v1):",
-		TranscriptionSaved:     "✅ Transcription configured!"},
+		Intro:                    "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
+		ChooseLLM:                "🤖 Which LLM engine?",
+		LLMOptions:               "1. Ollama\n2. Cerebras\n3. None",
+		OllamaConfig:             "⚙️ Configuring Ollama...",
+		CerebrasConfig:           "☁️ Configuring Cerebras. Note: Contact info and messages will be sent to Cerebras.",
+		CerebrasKey:              "🔑 Enter your Cerebras API Key (free quota available):",
+		CerebrasModel:            "🤖 Choose Cerebras Model:\n1. qwen-3-235b-a22b-instruct-2507\n2. zai-glm-4.6\n3. gpt-oss-120b\n4. llama-3.3-70b",
+		OllamaHost:               "🌐 Enter Ollama Host (IP/URL):",
+		OllamaPort:               "🔌 Enter Ollama Port (default 11434):",
+		OllamaModel:              "🤖 Enter Ollama Model (suggested: gpt-oss:20b or qwen30b+):",
+		ConfigSaved:              "✅ Batata configured! Say 'Batata help' anytime to change settings.",
+		MenuTitle:                "🥔 Batata Menu",
+		MenuOptions:              "1. 🌍 Change language\n2. ⚙️ Update LLM config\n3. 🧠 Set Blady's brain\n4. 🎙️ Transcription Config\n5. ☠️ Kill app\n6. 👋 Back to Blady",
+		KillGoodbye:              "☠️ Killing whatsabladerunner... Bye!",
+		InvalidInput:             "❌ Invalid input, try again.",
+		BackToBlady:              "👋 Returning control to Blady!",
+		MiscConfig:               "🔧 Misc config not implemented yet.",
+		SetBrain:                 "🧠 Pick LLM for Blady's brain:",
+		BrainOffline:             "⚠️ Blady's brain is OFFLINE. Only Batata interactions available.",
+		InvalidLanguageChoice:    "❌",
+		BrainSetOllama:           "🧠 Brain set to Ollama!",
+		BrainSetCerebras:         "🧠 Brain set to Cerebras!",
+		BrainSetNone:             "🧠 Brain set to None (Offline).",
+		BladyRunning:             "🤖 Blady is now running with provider %s and model: %s.",
+		InvalidCerebrasKey:       "❌ API key too short (min 20 chars). Going back...",
+		BrainError:               "⚠️ Error with Blady's brain: %s",
+		BrainErrorSuggest:        "ℹ️ Say 'Batata help' to re-configure.",
+		MediaStored:              "📦 Media stored: %s (ID: %d)",
+		TranscriptionConfig:      "🎙️ Transcription Configuration",
+		TranscriptionServerURL:   "🌐 Enter Transcription Server URL (e.g. http://localhost:8000/v1):",
+		TranscriptionSaved:       "✅ Transcription configured!",
+		TranscriptionSetupPrompt: "🎙️ Configure transcription server? (y/n)"},
 	LangHindi: {
 		Intro:                 "🥔 नमस्ते! मैं Batata हूँ, वह सरल कोर जो Blady के लिए बुनियादी ढांचे को संभालता है। आइए सब कुछ सेट करें!",
 		ChooseLLM:             "🤖 कौन सा LLM इंजन?",

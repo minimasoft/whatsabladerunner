@@ -16,16 +16,17 @@ import (
 type State int
 
 const (
-	StateIdle               State = 0
-	StateSetupLanguage      State = 1
-	StateSetupIntro         State = 2 // Transition state, shows intro then asks LLM
-	StateSetupLLMChoice     State = 3
-	StateSetupOllama        State = 4 // Sub-states for Ollama could be handled or just generic input
-	StateSetupCerebras      State = 5
-	StateMainMenu           State = 6
-	StateConfigMisc         State = 7
-	StateSetBrain           State = 8
-	StateSetupTranscription State = 9
+	StateIdle                     State = 0
+	StateSetupLanguage            State = 1
+	StateSetupIntro               State = 2 // Transition state, shows intro then asks LLM
+	StateSetupLLMChoice           State = 3
+	StateSetupOllama              State = 4 // Sub-states for Ollama could be handled or just generic input
+	StateSetupCerebras            State = 5
+	StateMainMenu                 State = 6
+	StateConfigMisc               State = 7
+	StateSetBrain                 State = 8
+	StateSetupTranscription       State = 9
+	StateSetupTranscriptionPrompt State = 10
 )
 
 // Sub-states or contextual variables might be needed
@@ -157,7 +158,7 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 			sendFunc(msg(k.s(func(s Strings) string { return s.CerebrasKey })))
 		case "3":
 			k.Config.BrainProvider = "none"
-			k.finishConfig(sendFunc)
+			k.askTranscriptionConfig(sendFunc)
 		default:
 			sendFunc(msg(k.s(func(s Strings) string { return s.InvalidInput })))
 		}
@@ -175,7 +176,7 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 			sendFunc(msg(k.s(func(s Strings) string { return s.OllamaModel })))
 		case 2:
 			k.Config.OllamaModel = cleanMsg
-			k.finishConfig(sendFunc)
+			k.askTranscriptionConfig(sendFunc)
 		}
 		return true
 
@@ -275,9 +276,24 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 			k.finishConfig(sendFunc)
 		}
 		return true
+
+	case StateSetupTranscriptionPrompt:
+		if strings.EqualFold(cleanMsg, "y") || strings.EqualFold(cleanMsg, "s") {
+			k.State = StateSetupTranscription
+			k.tempInputStep = 0
+			sendFunc(msg(k.s(func(s Strings) string { return s.TranscriptionConfig + "\n" + s.TranscriptionServerURL })))
+		} else {
+			k.finishConfig(sendFunc)
+		}
+		return true
 	}
 
 	return true
+}
+
+func (k *Kernel) askTranscriptionConfig(sendFunc func(string)) {
+	k.State = StateSetupTranscriptionPrompt
+	sendFunc(msg(k.s(func(s Strings) string { return s.TranscriptionSetupPrompt })))
 }
 
 func (k *Kernel) s(selector func(Strings) string) string {
