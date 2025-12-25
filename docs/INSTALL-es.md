@@ -2,6 +2,9 @@
 
 🌐 [English](INSTALL.md) | 🇦🇷 [Español](INSTALL-es.md) | 🇧🇷 [Português](INSTALL-pt.md) | 🇫🇷 [Français](INSTALL-fr.md) | 🇮🇹 [Italiano](INSTALL-it.md) | 🇩🇪 [Deutsch](INSTALL-de.md) | 🇮🇳 [हिन्दी](INSTALL-hi.md) | 🇮🇩 [Bahasa Indonesia](INSTALL-id.md)
 
+> [!TIP]
+> **Soporte para Docker/Podman**: También puedes usar Docker o Podman para ejecutar **whatsabladerunner**. Consulta [DOCKER.md](../DOCKER.md) para más instrucciones.
+
 ¡Bienvenido a **whatsabladerunner**! 🚀 Esta guía te ayudará a compilar e instalar el proyecto en tu sistema. ¡Una vez instalado, **whatsabladerunner** soporta 15 idiomas! 🌍
 
 ## 📋 Prerrequisitos

@@ -1,3 +1,4 @@
 - Bridges using custom actions and behaviors
 - Demo video
 - User manual for advanced configuration
+- Blady's own filesystem or database to allow complex applications to be vibecoded using only Blady.
