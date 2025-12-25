@@ -37,6 +37,7 @@ The project is structured as a Go application with various internal packages loc
 
 - **Purpose**: Defines and registers actions the LLM can perform (e.g., `memory_update`, `create_task`, `send_media`, `enable_behavior`).
 - **Main Types**: `Registry` (action storage), `Action` (interface for implementations).
+- **Core Logic**: `GetSchemasFiltered` allows mode-specific action availability (e.g., hiding `message_master` in command mode).
 - **Integration**: New functionality should be added as an `Action` and registered in `bot.go`.
 
 #### [`pkg/tasks`](./pkg/tasks)

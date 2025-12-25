@@ -29,7 +29,6 @@ import (
 	"whatsabladerunner/pkg/batata"
 	"whatsabladerunner/pkg/behaviors"
 	"whatsabladerunner/pkg/bot"
-	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/buttons"
 	"whatsabladerunner/pkg/cerebras"
 	"whatsabladerunner/pkg/history"
@@ -428,8 +427,9 @@ func eventHandler(evt interface{}) {
 							// If v.Info.IsFromMe, Sender is us. Wait.
 							// If I (me) send a note to self, v.Info.Sender is My JID. v.Info.Chat is My JID (as User).
 							// So targeting v.Info.Sender is correct for replying to the "Master".
+							// We use ToNonAD() to ensure we don't include device part, which SendMessage rejects.
 
-							targetJID := v.Info.Sender
+							targetJID := v.Info.Sender.ToNonAD()
 
 							_, err := whatsAppClient.SendMessage(context.Background(), targetJID, &waProto.Message{
 								Conversation: proto.String(msg),
@@ -440,7 +440,7 @@ func eventHandler(evt interface{}) {
 						}
 					}
 
-					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback, batataKernel)
+					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback, batataKernel, searchContacts)
 					wf.Run(ctx, msgText, contextMsgs)
 				})
 			} else {
@@ -804,9 +804,6 @@ func main() {
 	}
 	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client), batataKernel)
 	taskBot.SendMediaFunc = sendMedia
-	taskBot.ActionRegistry.Register(&actions.SearchContactsAction{
-		SearchFunc: searchContacts,
-	})
 
 	// Set up OnWatcherBlock callback to store withheld messages for LET IT BE override
 	taskBot.OnWatcherBlock = func(blockedMsg string, targetChatID string, sendFunc func(string)) {

@@ -53,9 +53,23 @@ func (r *Registry) Get(name string) (Action, bool) {
 
 // GetSchemas returns a list of schemas for all registered actions, sorted by name
 func (r *Registry) GetSchemas() []ActionSchema {
+	return r.GetSchemasFiltered(nil)
+}
+
+// GetSchemasFiltered returns a list of schemas for actions NOT in the exclude list, sorted by name
+func (r *Registry) GetSchemasFiltered(exclude []string) []ActionSchema {
 	schemas := make([]ActionSchema, 0, len(r.actions))
-	for _, a := range r.actions {
-		schemas = append(schemas, a.GetSchema())
+	for name, a := range r.actions {
+		excluded := false
+		for _, e := range exclude {
+			if e == name {
+				excluded = true
+				break
+			}
+		}
+		if !excluded {
+			schemas = append(schemas, a.GetSchema())
+		}
 	}
 	// Sort for deterministic output
 	sort.Slice(schemas, func(i, j int) bool {

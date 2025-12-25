@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"whatsabladerunner/pkg/bot"
+	"whatsabladerunner/pkg/bot/actions"
 	"whatsabladerunner/pkg/llm"
 	"whatsabladerunner/pkg/tasks"
 	"whatsabladerunner/pkg/workflow"
@@ -42,11 +43,17 @@ type CommandWorkflow struct {
 	Contacts string
 }
 
-func NewCommandWorkflow(client llm.Client, sendFunc func(string), sendMasterFunc func(string), contacts string, startTaskCallback func(*tasks.Task), reporter tasks.Reporter) *CommandWorkflow {
+func NewCommandWorkflow(client llm.Client, sendFunc func(string), sendMasterFunc func(string), contacts string, startTaskCallback func(*tasks.Task), reporter tasks.Reporter, searchFunc func(string) string) *CommandWorkflow {
 	// Assuming config is in "config" dir relative to CWD
 	// Pass sendFunc to Bot so it can handle response actions.
 	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc, contacts, reporter)
 	b.StartTaskCallback = startTaskCallback
+	if searchFunc != nil {
+		b.SearchContactsFunc = searchFunc
+		b.ActionRegistry.Register(&actions.SearchContactsAction{
+			SearchFunc: searchFunc,
+		})
+	}
 	return &CommandWorkflow{
 		Bot:      b,
 		SendFunc: sendFunc,

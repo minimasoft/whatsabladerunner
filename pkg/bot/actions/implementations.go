@@ -361,13 +361,16 @@ func (a *CreateTaskAction) Execute(ctx ActionContext, payload json.RawMessage) e
 
 func (a *CreateTaskAction) isValidContact(contact string) bool {
 	if a.GetContacts == nil {
+		fmt.Println("[CreateTaskAction] No contacts found.")
 		return false
 	}
 	contacts := a.GetContacts()
+	fmt.Println("[CreateTaskAction] Contacts: " + contacts)
 	if contacts == "" || contacts == "[]" {
+		fmt.Println("[CreateTaskAction] Contacts are empty")
 		return false
 	}
-	return strings.Contains(contacts, fmt.Sprintf(`"number":"%s"`, contact))
+	return strings.Contains(contacts, contact)
 }
 
 // --- Task Management Actions ---

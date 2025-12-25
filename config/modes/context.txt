@@ -8,11 +8,6 @@
 {{.Tasks}}
 ```
 
-## Contacts
-```
-{{.Contacts}}
-```
-
 ## Conversation context
 ```
 {{.Context}}

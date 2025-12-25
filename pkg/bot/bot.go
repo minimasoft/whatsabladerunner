@@ -34,6 +34,8 @@ type Bot struct {
 
 	// CurrentTaskID is set during ProcessTask to enable proper message tagging
 	CurrentTaskID int
+
+	SearchContactsFunc func(query string) string
 }
 
 func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string, reporter tasks.Reporter) *Bot {
@@ -132,6 +134,13 @@ func (b *Bot) registerActions() {
 		TaskManager:            b.TaskManager,
 	})
 
+	// Search Contacts
+	if b.SearchContactsFunc != nil {
+		b.ActionRegistry.Register(&actions.SearchContactsAction{
+			SearchFunc: b.SearchContactsFunc,
+		})
+	}
+
 	// Custom Actions
 	actionsDir := filepath.Join(b.ConfigDir, "actions")
 	if err := actions.LoadCustomActions(actionsDir, b.ActionRegistry); err != nil {
@@ -206,8 +215,15 @@ func (b *Bot) CheckMessage(proposedMsg string, context []string) (bool, string, 
 	return true, "", nil
 }
 
-func (b *Bot) getAvailableActionsJSON() string {
-	schemas := b.ActionRegistry.GetSchemas()
+func (b *Bot) getAvailableActionsJSON(mode string) string {
+	var exclude []string
+	if mode == "command" {
+		exclude = []string{"message_master"}
+	} else {
+		// Only command mode should have search_contacts
+		exclude = []string{"search_contacts"}
+	}
+	schemas := b.ActionRegistry.GetSchemasFiltered(exclude)
 	data, err := json.MarshalIndent(schemas, "", "  ")
 	if err != nil {
 		return "[]"
@@ -248,7 +264,7 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		Contacts:         b.Contacts,
 		Context:          strings.Join(context, "\n"),
 		Message:          msg,
-		AvailableActions: b.getAvailableActionsJSON(),
+		AvailableActions: b.getAvailableActionsJSON(mode),
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt(mode, modeData)
 	if err != nil {
@@ -396,7 +412,7 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		Context:          strings.Join(context, "\n"),
 		Message:          msg,
 		CurrentTask:      string(currentTaskJSON),
-		AvailableActions: b.getAvailableActionsJSON(),
+		AvailableActions: b.getAvailableActionsJSON("task"),
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt("task", modeData)
 	if err != nil {
@@ -545,7 +561,7 @@ func (b *Bot) ProcessBehaviors(activeBehaviors []behaviors.Behavior, msg string,
 			Contacts:         "[]",
 			Context:          strings.Join(context, "\n"),
 			Message:          msg,
-			AvailableActions: b.getAvailableActionsJSON(),
+			AvailableActions: b.getAvailableActionsJSON("behavior"),
 		},
 		EnabledBehaviors: behaviorsContent.String(),
 	}
