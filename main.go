@@ -37,6 +37,7 @@ import (
 	"whatsabladerunner/pkg/locks"
 	"whatsabladerunner/pkg/ollama"
 	"whatsabladerunner/pkg/tasks"
+	"whatsabladerunner/pkg/transcription"
 	"whatsabladerunner/workflows"
 )
 
@@ -248,6 +249,29 @@ func eventHandler(evt interface{}) {
 
 							// Update msgText so it's saved in history for LLM
 							mediaRef := fmt.Sprintf("[Media: %s ID: %d]", mtype, mediaID)
+
+							// Audio Transcription Integration
+							if mtype == "audio" && batataKernel.Config.TranscriptionServer != "" {
+								fmt.Println("Start transcription...")
+								if isSelfChat && whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+									whatsAppClient.SendMessage(context.Background(), whatsAppClient.Store.ID.ToNonAD(), &waProto.Message{
+										Conversation: proto.String("🎙️ Transcribing audio..."),
+									})
+								}
+
+								transcript, err := transcription.Transcribe(batataKernel.Config.TranscriptionServer, batataKernel.Config.TranscriptionServerKey, data, fmt.Sprintf("%d.%s", mediaID, ext))
+								if err != nil {
+									fmt.Printf("Transcription failed: %v\n", err)
+									mediaRef += "\n[Transcription Failed]"
+								} else {
+									fmt.Printf("Transcription success: %s\n", transcript)
+									mediaRef += "\n\n[Transcript]:\n" + transcript
+									// Save transcript to file
+									if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.transcript.txt", mediaID)), []byte(transcript), 0644); err != nil {
+										fmt.Printf("Failed to save transcript file: %v\n", err)
+									}
+								}
+							}
 							if msgText != "" {
 								msgText += "\n" + mediaRef
 							} else {

@@ -16,15 +16,16 @@ import (
 type State int
 
 const (
-	StateIdle           State = 0
-	StateSetupLanguage  State = 1
-	StateSetupIntro     State = 2 // Transition state, shows intro then asks LLM
-	StateSetupLLMChoice State = 3
-	StateSetupOllama    State = 4 // Sub-states for Ollama could be handled or just generic input
-	StateSetupCerebras  State = 5
-	StateMainMenu       State = 6
-	StateConfigMisc     State = 7
-	StateSetBrain       State = 8
+	StateIdle               State = 0
+	StateSetupLanguage      State = 1
+	StateSetupIntro         State = 2 // Transition state, shows intro then asks LLM
+	StateSetupLLMChoice     State = 3
+	StateSetupOllama        State = 4 // Sub-states for Ollama could be handled or just generic input
+	StateSetupCerebras      State = 5
+	StateMainMenu           State = 6
+	StateConfigMisc         State = 7
+	StateSetBrain           State = 8
+	StateSetupTranscription State = 9
 )
 
 // Sub-states or contextual variables might be needed
@@ -32,14 +33,16 @@ const (
 // but for this flow, flat states + a few variables work.
 
 type Config struct {
-	Language       Language `json:"language"`
-	OllamaHost     string   `json:"ollama_host"`
-	OllamaPort     string   `json:"ollama_port"`
-	OllamaModel    string   `json:"ollama_model"`
-	CerebrasKey    string   `json:"cerebras_key"`
-	CerebrasModel  string   `json:"cerebras_model"`
-	BrainProvider  string   `json:"brain_provider"` // Which one is active for Blady
-	TimeoutSeconds int      `json:"timeout_seconds"`
+	Language               Language `json:"language"`
+	OllamaHost             string   `json:"ollama_host"`
+	OllamaPort             string   `json:"ollama_port"`
+	OllamaModel            string   `json:"ollama_model"`
+	CerebrasKey            string   `json:"cerebras_key"`
+	CerebrasModel          string   `json:"cerebras_model"`
+	BrainProvider          string   `json:"brain_provider"` // Which one is active for Blady
+	TimeoutSeconds         int      `json:"timeout_seconds"`
+	TranscriptionServer    string   `json:"transcription_server"`
+	TranscriptionServerKey string   `json:"transcription_server_key"`
 }
 
 type Kernel struct {
@@ -56,13 +59,14 @@ func NewKernel(configDir string) *Kernel {
 	return &Kernel{
 		ConfigPath: filepath.Join(configDir, "batata.json"),
 		Config: Config{
-			Language:       LangEnglish, // Default fallack
-			BrainProvider:  "none",
-			TimeoutSeconds: 180,
-			OllamaHost:     "http://localhost",
-			OllamaPort:     "11434",
-			OllamaModel:    "qwen3:8b",
-			CerebrasModel:  "gpt-oss-120b",
+			Language:            LangEnglish, // Default fallack
+			BrainProvider:       "none",
+			TimeoutSeconds:      180,
+			OllamaHost:          "http://localhost",
+			OllamaPort:          "11434",
+			OllamaModel:         "qwen3:8b",
+			CerebrasModel:       "gpt-oss-120b",
+			TranscriptionServer: "",
 		},
 		State: StateIdle,
 	}
@@ -218,8 +222,9 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 			k.State = StateSetBrain
 			sendFunc(menu(k.s(func(s Strings) string { return s.SetBrain + "\n1. Ollama\n2. Cerebras\n3. None" })))
 		case "4":
-			sendFunc(msg(k.s(func(s Strings) string { return s.MiscConfig })))
-			k.sendMenu(sendFunc)
+			k.State = StateSetupTranscription
+			k.tempInputStep = 0
+			sendFunc(msg(k.s(func(s Strings) string { return s.TranscriptionConfig + "\n" + s.TranscriptionServerURL })))
 		case "5":
 			sendFunc(msg(k.s(func(s Strings) string { return s.KillGoodbye })))
 			if killFunc != nil {
@@ -252,6 +257,23 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 		k.Save()
 		sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
 		k.State = StateIdle
+		return true
+
+	case StateSetupTranscription:
+		switch k.tempInputStep {
+		case 0:
+			k.Config.TranscriptionServer = cleanMsg
+			k.tempInputStep++
+			sendFunc(msg("🔑 Enter API Key / Ingrese API Key (or/o 'none'):"))
+		case 1:
+			if !strings.EqualFold(cleanMsg, "none") {
+				k.Config.TranscriptionServerKey = cleanMsg
+			} else {
+				k.Config.TranscriptionServerKey = ""
+			}
+			sendFunc(msg(k.s(func(s Strings) string { return s.TranscriptionSaved })))
+			k.finishConfig(sendFunc)
+		}
 		return true
 	}
 
