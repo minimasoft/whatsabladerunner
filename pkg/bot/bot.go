@@ -36,7 +36,7 @@ type Bot struct {
 	CurrentTaskID int
 }
 
-func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string) *Bot {
+func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMasterFunc func(string), contacts string, reporter tasks.Reporter) *Bot {
 	b := &Bot{
 		Client:          client,
 		PromptManager:   prompt.NewPromptManager(configDir),
@@ -48,6 +48,8 @@ func NewBot(client llm.Client, configDir string, sendFunc func(string), sendMast
 		SendMasterFunc:  sendMasterFunc,
 		Contacts:        contacts,
 	}
+	b.TaskManager.Reporter = reporter
+	b.TaskManager.SendFunc = sendMasterFunc
 
 	b.registerActions()
 	return b

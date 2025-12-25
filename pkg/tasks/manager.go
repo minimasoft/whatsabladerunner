@@ -40,10 +40,19 @@ type CreateTaskContent struct {
 	ScheduleDatetime string `json:"schedule_datetime,omitempty"`
 }
 
+// Reporter is an interface for reporting task status changes to the user via a kernel (e.g. Batata)
+type Reporter interface {
+	ReportTaskDeleted(id int, sendFunc func(string))
+	ReportTaskPaused(id int, sendFunc func(string))
+	ReportTaskResumed(id int, sendFunc func(string))
+}
+
 // TaskManager handles all task file operations
 type TaskManager struct {
 	TasksDir   string
 	DeletedDir string
+	Reporter   Reporter
+	SendFunc   func(string)
 }
 
 // NewTaskManager creates a new TaskManager for the given tasks directory
@@ -223,6 +232,9 @@ func (tm *TaskManager) DeleteTask(id int) error {
 	}
 
 	fmt.Printf("[TaskManager] Deleted task %d (moved to deleted/)\n", id)
+	if tm.Reporter != nil && tm.SendFunc != nil {
+		tm.Reporter.ReportTaskDeleted(id, tm.SendFunc)
+	}
 	return nil
 }
 
@@ -275,6 +287,9 @@ func (tm *TaskManager) PauseTask(id int) error {
 	}
 
 	fmt.Printf("[TaskManager] Paused task %d: status changed to %s\n", id, task.Status)
+	if tm.Reporter != nil && tm.SendFunc != nil {
+		tm.Reporter.ReportTaskPaused(id, tm.SendFunc)
+	}
 	return nil
 }
 
@@ -295,6 +310,9 @@ func (tm *TaskManager) ResumeTask(id int) error {
 	}
 
 	fmt.Printf("[TaskManager] Resumed task %d: status changed to %s\n", id, task.Status)
+	if tm.Reporter != nil && tm.SendFunc != nil {
+		tm.Reporter.ReportTaskResumed(id, tm.SendFunc)
+	}
 	return nil
 }
 

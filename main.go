@@ -440,7 +440,7 @@ func eventHandler(evt interface{}) {
 						}
 					}
 
-					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback)
+					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback, batataKernel)
 					wf.Run(ctx, msgText, contextMsgs)
 				})
 			} else {
@@ -802,7 +802,7 @@ func main() {
 			}
 		}
 	}
-	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client))
+	taskBot = bot.NewBot(llmClient, "config", nil, sendMasterFromTask, getAllContactsJSON(client), batataKernel)
 	taskBot.SendMediaFunc = sendMedia
 	taskBot.ActionRegistry.Register(&actions.SearchContactsAction{
 		SearchFunc: searchContacts,

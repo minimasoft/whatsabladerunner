@@ -345,3 +345,15 @@ func (k *Kernel) ReportMediaStored(mediaType string, mediaID int64, sendFunc fun
 	report := fmt.Sprintf(k.s(func(s Strings) string { return s.MediaStored }), mediaType, mediaID)
 	sendFunc(msg(report))
 }
+
+func (k *Kernel) ReportTaskDeleted(id int, sendFunc func(string)) {
+	sendFunc(msg(fmt.Sprintf(k.s(func(s Strings) string { return s.TaskDeleted }), id)))
+}
+
+func (k *Kernel) ReportTaskPaused(id int, sendFunc func(string)) {
+	sendFunc(msg(fmt.Sprintf(k.s(func(s Strings) string { return s.TaskPaused }), id)))
+}
+
+func (k *Kernel) ReportTaskResumed(id int, sendFunc func(string)) {
+	sendFunc(msg(fmt.Sprintf(k.s(func(s Strings) string { return s.TaskResumed }), id)))
+}

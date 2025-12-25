@@ -42,10 +42,10 @@ type CommandWorkflow struct {
 	Contacts string
 }
 
-func NewCommandWorkflow(client llm.Client, sendFunc func(string), sendMasterFunc func(string), contacts string, startTaskCallback func(*tasks.Task)) *CommandWorkflow {
+func NewCommandWorkflow(client llm.Client, sendFunc func(string), sendMasterFunc func(string), contacts string, startTaskCallback func(*tasks.Task), reporter tasks.Reporter) *CommandWorkflow {
 	// Assuming config is in "config" dir relative to CWD
 	// Pass sendFunc to Bot so it can handle response actions.
-	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc, contacts)
+	b := bot.NewBot(client, "config", sendFunc, sendMasterFunc, contacts, reporter)
 	b.StartTaskCallback = startTaskCallback
 	return &CommandWorkflow{
 		Bot:      b,

@@ -73,6 +73,9 @@ type Strings struct {
 	TranscriptionServerURL   string
 	TranscriptionSaved       string
 	TranscriptionSetupPrompt string
+	TaskDeleted              string
+	TaskPaused               string
+	TaskResumed              string
 }
 
 var LangStrings = map[Language]Strings{
@@ -108,7 +111,10 @@ var LangStrings = map[Language]Strings{
 		TranscriptionConfig:      "🎙️ Configuración de Transcripción",
 		TranscriptionServerURL:   "🌐 Ingresa URL del servidor de transcripción (ej: http://localhost:8000/v1):",
 		TranscriptionSaved:       "✅ ¡Transcripción configurada!",
-		TranscriptionSetupPrompt: "🎙️ ¿Configurar servidor de transcripción? (s/n)"},
+		TranscriptionSetupPrompt: "🎙️ ¿Configurar servidor de transcripción? (s/n)",
+		TaskDeleted:              "🗑️ Tarea %d eliminada.",
+		TaskPaused:               "⏸️ Tarea %d pausada.",
+		TaskResumed:              "▶️ Tarea %d reanudada."},
 	LangEnglish: {
 		Intro:                    "🥔 Hey! I'm Batata, the dumb core that handles basic infrastructure for Blady. Let's set things up!",
 		ChooseLLM:                "🤖 Which LLM engine?",
@@ -141,7 +147,10 @@ var LangStrings = map[Language]Strings{
 		TranscriptionConfig:      "🎙️ Transcription Configuration",
 		TranscriptionServerURL:   "🌐 Enter Transcription Server URL (e.g. http://localhost:8000/v1):",
 		TranscriptionSaved:       "✅ Transcription configured!",
-		TranscriptionSetupPrompt: "🎙️ Configure transcription server? (y/n)"},
+		TranscriptionSetupPrompt: "🎙️ Configure transcription server? (y/n)",
+		TaskDeleted:              "🗑️ Task %d deleted.",
+		TaskPaused:               "⏸️ Task %d paused.",
+		TaskResumed:              "▶️ Task %d resumed."},
 	LangHindi: {
 		Intro:                 "🥔 नमस्ते! मैं Batata हूँ, वह सरल कोर जो Blady के लिए बुनियादी ढांचे को संभालता है। आइए सब कुछ सेट करें!",
 		ChooseLLM:             "🤖 कौन सा LLM इंजन?",
