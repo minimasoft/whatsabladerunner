@@ -1,5 +1,3 @@
-# [WIP] ETA: 25/12/25
-
 # whatsabladerunner
 
 🌐 [English](../README.md) | 🇦🇷 [Español](README-es.md) | 🇧🇷 [Português](README-pt.md)

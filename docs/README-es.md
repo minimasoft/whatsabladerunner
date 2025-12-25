@@ -1,12 +1,10 @@
-# [WIP] ETA: 25/12/25
-
 # whatsabladerunner
 
 🌐 [English](../README.md) | 🇦🇷 [Español](README-es.md) | 🇧🇷 [Português](README-pt.md)
 
 > "Yo he visto cosas que vosotros no creeríais. Humanos hablando durante horas con multiplicaciones de matrices..."
 
-Un **whatsabladerunner** es un ~~oficial de policía~~ *bot puerco* especial encargado de cazar y "retirar" tus interacciones con bots comerciales en WhatsApp.
+Un **whatsabladerunner** es un ~~oficial de policía~~ *cerdo-bot* especial encargado de cazar y "retirar" tus interacciones con bots comerciales en WhatsApp.
 
 ## La Licencia
 
@@ -26,7 +24,7 @@ $$\lim_{precio \to 0} \frac{Utilidad}{Precio} = \infty$$
 
 #### **P: ¿Qué pasa con el tiempo dedicado a desarrollar whatsabladerunner?**
 
-R: Todo se perderá, como lágrimas en la lluvia.
+R: Se perdió todo, como lágrimas en la lluvia.
 
 ## Comenzando
 
