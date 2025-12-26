@@ -1,0 +1,1 @@
+When a audio message is received with a transcription: brief the master with the contents of the audio, include the source contact.

@@ -161,3 +161,39 @@ func (bm *BehaviorManager) GetActiveBehaviors(contact string) ([]Behavior, error
 
 	return matchBehaviors, nil
 }
+
+// GetAllActiveBehaviors returns all enabled behaviors across all contacts
+func (bm *BehaviorManager) GetAllActiveBehaviors() ([]Behavior, error) {
+	entries, err := os.ReadDir(bm.BehaviorsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []Behavior{}, nil
+		}
+		return nil, fmt.Errorf("failed to read behaviors directory: %w", err)
+	}
+
+	var matchBehaviors []Behavior
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || entry.Name() == "_last_id" {
+			continue
+		}
+
+		path := filepath.Join(bm.BehaviorsDir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var b Behavior
+		if err := json.Unmarshal(data, &b); err != nil {
+			continue
+		}
+
+		if b.Status == StatusEnabled {
+			matchBehaviors = append(matchBehaviors, b)
+		}
+	}
+
+	return matchBehaviors, nil
+}

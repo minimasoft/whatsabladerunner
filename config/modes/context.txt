@@ -8,6 +8,16 @@
 {{.Tasks}}
 ```
 
+## Available Behaviors
+```
+{{.Behaviors}}
+```
+
+## Active Behaviors
+```
+{{.ActiveBehaviors}}
+```
+
 ## Conversation context
 ```
 {{.Context}}

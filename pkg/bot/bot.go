@@ -231,6 +231,22 @@ func (b *Bot) getAvailableActionsJSON(mode string) string {
 	return string(data)
 }
 
+func (b *Bot) getAvailableBehaviors() string {
+	dir := filepath.Join(b.ConfigDir, "modes", "behavior")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+
+	var templates []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".txt") && !strings.HasPrefix(entry.Name(), "__") {
+			templates = append(templates, strings.TrimSuffix(entry.Name(), ".txt"))
+		}
+	}
+	return strings.Join(templates, ", ")
+}
+
 func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, error) {
 	// 1. Load System Prompt
 	sysPrompt, err := b.PromptManager.LoadSystemPrompt("Spanish")
@@ -258,6 +274,19 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 	}
 
 	// 4. Load Mode Prompt
+	var activeBehaviorsJSON string
+	var behaviorsList string
+	if mode == "command" {
+		behaviorsList = b.getAvailableBehaviors()
+		if b.BehaviorManager != nil {
+			activeBehaviors, err := b.BehaviorManager.GetAllActiveBehaviors()
+			if err == nil {
+				data, _ := json.Marshal(activeBehaviors)
+				activeBehaviorsJSON = string(data)
+			}
+		}
+	}
+
 	modeData := prompt.ModeData{
 		Memories:         string(memoriesContent),
 		Tasks:            string(tasksJSON),
@@ -265,6 +294,8 @@ func (b *Bot) Process(mode string, msg string, context []string) (*BotResponse, 
 		Context:          strings.Join(context, "\n"),
 		Message:          msg,
 		AvailableActions: b.getAvailableActionsJSON(mode),
+		Behaviors:        behaviorsList,
+		ActiveBehaviors:  activeBehaviorsJSON,
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt(mode, modeData)
 	if err != nil {
@@ -413,6 +444,8 @@ func (b *Bot) ProcessTask(task *tasks.Task, msg string, context []string, sendTo
 		Message:          msg,
 		CurrentTask:      string(currentTaskJSON),
 		AvailableActions: b.getAvailableActionsJSON("task"),
+		Behaviors:        "",
+		ActiveBehaviors:  "[]",
 	}
 	modePrompt, err := b.PromptManager.LoadModePrompt("task", modeData)
 	if err != nil {
@@ -562,6 +595,8 @@ func (b *Bot) ProcessBehaviors(activeBehaviors []behaviors.Behavior, msg string,
 			Context:          strings.Join(context, "\n"),
 			Message:          msg,
 			AvailableActions: b.getAvailableActionsJSON("behavior"),
+			Behaviors:        "",
+			ActiveBehaviors:  "[]",
 		},
 		EnabledBehaviors: behaviorsContent.String(),
 	}

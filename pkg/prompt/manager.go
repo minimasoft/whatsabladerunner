@@ -23,6 +23,8 @@ type ModeData struct {
 	Message          string
 	CurrentTask      string // JSON of current task for task mode
 	AvailableActions string // JSON schema of available actions
+	Behaviors        string // List of available behaviors
+	ActiveBehaviors  string // JSON string of all active behaviors
 }
 
 type BehaviorData struct {
@@ -121,22 +123,22 @@ func (pm *PromptManager) LoadWatcherPrompt(data WatcherData) (string, error) {
 func (pm *PromptManager) LoadBehaviorPrompt(data BehaviorData) (string, error) {
 	var sb strings.Builder
 
-	// 1. Load context.txt
-	contextPath := filepath.Join(pm.ConfigDir, "modes", "context.txt")
-	contextContent, err := pm.renderFile(contextPath, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to load behavior context.txt: %w", err)
-	}
-	sb.WriteString(contextContent)
-	sb.WriteString("\n")
-
-	// 2. Load __base.txt templated with enabled behaviors
+	// 1. Load __base.txt templated with enabled behaviors
 	basePath := filepath.Join(pm.ConfigDir, "modes", "behavior", "__base.txt")
 	baseContent, err := pm.renderFile(basePath, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to load behavior __base.txt: %w", err)
 	}
 	sb.WriteString(baseContent)
+	sb.WriteString("\n")
+
+	// 2. Load context.txt
+	contextPath := filepath.Join(pm.ConfigDir, "modes", "context.txt")
+	contextContent, err := pm.renderFile(contextPath, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to load behavior context.txt: %w", err)
+	}
+	sb.WriteString(contextContent)
 	sb.WriteString("\n")
 
 	// 3. Load protocol.txt

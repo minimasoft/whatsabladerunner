@@ -43,3 +43,4 @@ docs/samples/message4.unmarshal
 config/batata.json
 logs/llm/
 plain_media/
+config/behaviors
