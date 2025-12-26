@@ -112,563 +112,591 @@ func downloadMedia(msg *events.Message) ([]byte, string, string, error) {
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
-		fmt.Println("------------------------------------------------")
-		fmt.Printf("Received a message!\nInfo: %+v\n", v.Info)
-		fmt.Printf("Message Struct: %+v\n", v.Message)
-		fmt.Println("------------------------------------------------")
+		go func(v *events.Message) {
+			fmt.Println("------------------------------------------------")
+			fmt.Printf("Received a message!\nInfo: %+v\n", v.Info)
+			fmt.Printf("Message Struct: %+v\n", v.Message)
+			fmt.Println("------------------------------------------------")
 
-		// Save message to history
-		// We want to save ALL text messages to history to have a full log.
-		// Extract text again or reuse if possible.
-		// Refactoring slightly to extract text earlier for both saving and workflow.
+			// Save message to history
+			// We want to save ALL text messages to history to have a full log.
+			// Extract text again or reuse if possible.
+			// Refactoring slightly to extract text earlier for both saving and workflow.
 
-		msgText := ""
-		if v.Message != nil {
-			if v.Message.ExtendedTextMessage != nil {
-				msgText = *v.Message.ExtendedTextMessage.Text
-			} else if v.Message.Conversation != nil {
-				msgText = *v.Message.Conversation
-			} else if v.Message.ButtonsMessage != nil {
-				// Handle buttons message - extract content text and button options with JSON IDs
-				bm := v.Message.ButtonsMessage
-				if bm.ContentText != nil {
-					msgText = *bm.ContentText
-				}
-				// Append button options with both display text and button ID JSON
-				if len(bm.Buttons) > 0 {
-					msgText += "\n\n[Opciones de respuesta - responder con el buttonID JSON]:"
-					for _, btn := range bm.Buttons {
-						displayText := ""
-						buttonID := ""
-						if btn.ButtonText != nil && btn.ButtonText.DisplayText != nil {
-							displayText = *btn.ButtonText.DisplayText
-						}
-						if btn.ButtonID != nil {
-							buttonID = *btn.ButtonID
-						}
-						msgText += fmt.Sprintf("\n- \"%s\" -> buttonID: %s", displayText, buttonID)
+			msgText := ""
+			if v.Message != nil {
+				if v.Message.ExtendedTextMessage != nil {
+					msgText = *v.Message.ExtendedTextMessage.Text
+				} else if v.Message.Conversation != nil {
+					msgText = *v.Message.Conversation
+				} else if v.Message.ButtonsMessage != nil {
+					// Handle buttons message - extract content text and button options with JSON IDs
+					bm := v.Message.ButtonsMessage
+					if bm.ContentText != nil {
+						msgText = *bm.ContentText
 					}
-				}
-				// Store buttons context for later response
-				buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
-					MessageID: v.Info.ID,
-					ChatJID:   v.Info.Chat,
-					SenderJID: v.Info.Sender,
-					SenderAlt: v.Info.MessageSource.SenderAlt,
-					Message:   v.Message,
-				})
-				fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s sender=%s senderAlt=%s\n",
-					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
-			} else if v.Message.ListMessage != nil {
-				// Handle list message (dropdown options)
-				lm := v.Message.ListMessage
-				if lm.Description != nil {
-					msgText = *lm.Description
-				}
-				// Extract list sections and rows
-				if len(lm.Sections) > 0 {
-					msgText += "\n\n[Opciones de lista - responder con el rowID JSON]:"
-					for _, section := range lm.Sections {
-						for _, row := range section.Rows {
-							title := ""
-							rowID := ""
-							if row.Title != nil {
-								title = *row.Title
+					// Append button options with both display text and button ID JSON
+					if len(bm.Buttons) > 0 {
+						msgText += "\n\n[Opciones de respuesta - responder con el buttonID JSON]:"
+						for _, btn := range bm.Buttons {
+							displayText := ""
+							buttonID := ""
+							if btn.ButtonText != nil && btn.ButtonText.DisplayText != nil {
+								displayText = *btn.ButtonText.DisplayText
 							}
-							if row.RowID != nil {
-								rowID = *row.RowID
+							if btn.ButtonID != nil {
+								buttonID = *btn.ButtonID
 							}
-							msgText += fmt.Sprintf("\n- \"%s\" -> rowID: %s", title, rowID)
+							msgText += fmt.Sprintf("\n- \"%s\" -> buttonID: %s", displayText, buttonID)
 						}
 					}
-				}
-				// Store list context for later response
-				buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
-					MessageID: v.Info.ID,
-					ChatJID:   v.Info.Chat,
-					SenderJID: v.Info.Sender,
-					SenderAlt: v.Info.MessageSource.SenderAlt,
-					Message:   v.Message,
-				})
-				fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s sender=%s senderAlt=%s\n",
-					v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
-			}
-		}
-
-		// Media Handling
-		isSelfChat := v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User
-		var activeTask *tasks.Task
-		if !v.Info.IsFromMe {
-			activeTask, _ = taskBot.TaskManager.GetTaskByContact(v.Info.Chat.String())
-		}
-
-		if (isSelfChat || activeTask != nil) && v.Message != nil {
-			// Check if it's a media message
-			isMedia := v.Message.ImageMessage != nil || v.Message.VideoMessage != nil || v.Message.AudioMessage != nil || v.Message.DocumentMessage != nil
-			if isMedia {
-				fmt.Printf("Processing media message (Self: %v, Task: %v)\n", isSelfChat, activeTask != nil)
-				data, mtype, ext, err := downloadMedia(v)
-				if err != nil {
-					fmt.Printf("Failed to download media: %v\n", err)
-				} else {
-					// Save metadata to DB
-					var mimetype string
-					if v.Message.ImageMessage != nil {
-						mimetype = v.Message.ImageMessage.GetMimetype()
-					} else if v.Message.VideoMessage != nil {
-						mimetype = v.Message.VideoMessage.GetMimetype()
-					} else if v.Message.AudioMessage != nil {
-						mimetype = v.Message.AudioMessage.GetMimetype()
-					} else if v.Message.DocumentMessage != nil {
-						mimetype = v.Message.DocumentMessage.GetMimetype()
-					}
-
-					mediaID, err := historyStore.SaveMedia(history.MediaInfo{
+					// Store buttons context for later response
+					buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
 						MessageID: v.Info.ID,
-						ChatJID:   v.Info.Chat.String(),
-						SenderJID: v.Info.Sender.String(),
-						MediaType: mtype,
-						MimeType:  mimetype,
-						Filename:  ext, // Store extension in Filename field
-						Timestamp: v.Info.Timestamp,
+						ChatJID:   v.Info.Chat,
+						SenderJID: v.Info.Sender,
+						SenderAlt: v.Info.MessageSource.SenderAlt,
+						Message:   v.Message,
 					})
-
-					if err != nil {
-						fmt.Printf("Failed to save media metadata: %v\n", err)
-					} else {
-						// Store file
-						dir := filepath.Join("plain_media", mtype)
-						os.MkdirAll(dir, 0755)
-						filePath := filepath.Join(dir, fmt.Sprintf("%d.%s", mediaID, ext))
-						err = os.WriteFile(filePath, data, 0644)
-						if err != nil {
-							fmt.Printf("Failed to save media file: %v\n", err)
-						} else {
-							fmt.Printf("Media stored at %s\n", filePath)
-
-							// Update msgText so it's saved in history for LLM
-							mediaRef := fmt.Sprintf("[Media: %s ID: %d]", mtype, mediaID)
-
-							// Audio Transcription Integration
-							if mtype == "audio" && batataKernel.Config.TranscriptionServer != "" {
-								fmt.Println("Start transcription...")
-								if isSelfChat && whatsAppClient != nil && whatsAppClient.Store.ID != nil {
-									whatsAppClient.SendMessage(context.Background(), whatsAppClient.Store.ID.ToNonAD(), &waProto.Message{
-										Conversation: proto.String("🎙️ Transcribing audio..."),
-									})
+					fmt.Printf("[ButtonsContext] Stored buttons message ID=%s from chat=%s sender=%s senderAlt=%s\n",
+						v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
+				} else if v.Message.ListMessage != nil {
+					// Handle list message (dropdown options)
+					lm := v.Message.ListMessage
+					if lm.Description != nil {
+						msgText = *lm.Description
+					}
+					// Extract list sections and rows
+					if len(lm.Sections) > 0 {
+						msgText += "\n\n[Opciones de lista - responder con el rowID JSON]:"
+						for _, section := range lm.Sections {
+							for _, row := range section.Rows {
+								title := ""
+								rowID := ""
+								if row.Title != nil {
+									title = *row.Title
 								}
+								if row.RowID != nil {
+									rowID = *row.RowID
+								}
+								msgText += fmt.Sprintf("\n- \"%s\" -> rowID: %s", title, rowID)
+							}
+						}
+					}
+					// Store list context for later response
+					buttonManager.Store(v.Info.Chat.String(), &buttons.ButtonsContext{
+						MessageID: v.Info.ID,
+						ChatJID:   v.Info.Chat,
+						SenderJID: v.Info.Sender,
+						SenderAlt: v.Info.MessageSource.SenderAlt,
+						Message:   v.Message,
+					})
+					fmt.Printf("[ButtonsContext] Stored list message ID=%s from chat=%s sender=%s senderAlt=%s\n",
+						v.Info.ID, v.Info.Chat, v.Info.Sender, v.Info.MessageSource.SenderAlt)
+				}
+			}
 
-								transcript, err := transcription.Transcribe(batataKernel.Config.TranscriptionServer, batataKernel.Config.TranscriptionServerKey, data, fmt.Sprintf("%d.%s", mediaID, ext))
-								if err != nil {
-									fmt.Printf("Transcription failed: %v\n", err)
-									mediaRef += "\n[Transcription Failed]"
-								} else {
-									fmt.Printf("Transcription success: %s\n", transcript)
-									mediaRef += "\n\n[Transcript]:\n" + transcript
-									// Save transcript to file
-									if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.transcript.txt", mediaID)), []byte(transcript), 0644); err != nil {
-										fmt.Printf("Failed to save transcript file: %v\n", err)
+			// Media Handling
+			isSelfChat := v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User
+			var activeTask *tasks.Task
+
+			if v.Message != nil {
+				// Check if it's a media message
+				isMedia := v.Message.ImageMessage != nil ||
+					v.Message.VideoMessage != nil ||
+					v.Message.AudioMessage != nil ||
+					v.Message.DocumentMessage != nil ||
+					v.Info.MediaType == "ptt" ||
+					v.Info.MediaType == "media" // Generic media type sometimes used in logs
+
+				// Lookup active task - check if this chat has an active task.
+				// Try primary chat JID first, then SenderAlt if available (handles LID -> JID transition for 1:1 chats)
+				activeTask, _ = taskBot.TaskManager.GetTaskByContact(v.Info.Chat.String())
+				if activeTask == nil && !v.Info.IsGroup && !v.Info.MessageSource.SenderAlt.IsEmpty() {
+					activeTask, _ = taskBot.TaskManager.GetTaskByContact(v.Info.MessageSource.SenderAlt.String())
+				}
+
+				if (isSelfChat || activeTask != nil) && isMedia {
+					fmt.Printf("Processing media message (Self: %v, Task: %v)\n", isSelfChat, activeTask != nil)
+					data, mtype, ext, err := downloadMedia(v)
+					if err != nil {
+						fmt.Printf("Failed to download media: %v\n", err)
+					} else {
+						// Save metadata to DB
+						var mimetype string
+						if v.Message.ImageMessage != nil {
+							mimetype = v.Message.ImageMessage.GetMimetype()
+						} else if v.Message.VideoMessage != nil {
+							mimetype = v.Message.VideoMessage.GetMimetype()
+						} else if v.Message.AudioMessage != nil {
+							mimetype = v.Message.AudioMessage.GetMimetype()
+						} else if v.Message.DocumentMessage != nil {
+							mimetype = v.Message.DocumentMessage.GetMimetype()
+						}
+
+						mediaID, err := historyStore.SaveMedia(history.MediaInfo{
+							MessageID: v.Info.ID,
+							ChatJID:   v.Info.Chat.String(),
+							SenderJID: v.Info.Sender.String(),
+							MediaType: mtype,
+							MimeType:  mimetype,
+							Filename:  ext, // Store extension in Filename field
+							Timestamp: v.Info.Timestamp,
+						})
+
+						if err != nil {
+							fmt.Printf("Failed to save media metadata: %v\n", err)
+						} else {
+							// Store file
+							dir := filepath.Join("plain_media", mtype)
+							os.MkdirAll(dir, 0755)
+							filePath := filepath.Join(dir, fmt.Sprintf("%d.%s", mediaID, ext))
+							err = os.WriteFile(filePath, data, 0644)
+							if err != nil {
+								fmt.Printf("Failed to save media file: %v\n", err)
+							} else {
+								fmt.Printf("Media stored at %s\n", filePath)
+
+								// Update msgText so it's saved in history for LLM
+								mediaRef := fmt.Sprintf("[Media: %s ID: %d]", mtype, mediaID)
+
+								// Audio Transcription Integration
+								if mtype == "audio" && batataKernel.Config.TranscriptionServer != "" {
+									fmt.Println("Start transcription...")
+									if isSelfChat && whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+										whatsAppClient.SendMessage(context.Background(), whatsAppClient.Store.ID.ToNonAD(), &waProto.Message{
+											Conversation: proto.String("🎙️ Transcribing audio..."),
+										})
+									}
+
+									transcript, err := transcription.Transcribe(batataKernel.Config.TranscriptionServer, batataKernel.Config.TranscriptionServerKey, batataKernel.Config.TranscriptionModel, data, fmt.Sprintf("%d.%s", mediaID, ext))
+									if err != nil {
+										fmt.Printf("Transcription failed: %v\n", err)
+										mediaRef += "\n[Transcription Failed]"
+									} else {
+										fmt.Printf("Transcription success: %s\n", transcript)
+										mediaRef += "\n\n[Transcript]:\n" + transcript
+										// Save transcript to file
+										if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.transcript.txt", mediaID)), []byte(transcript), 0644); err != nil {
+											fmt.Printf("Failed to save transcript file: %v\n", err)
+										}
 									}
 								}
-							}
-							if msgText != "" {
-								msgText += "\n" + mediaRef
-							} else {
-								msgText = mediaRef
-							}
-
-							// Report to user in self-chat
-							if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
-								selfJID := whatsAppClient.Store.ID.ToNonAD()
-								replyFunc := func(msg string) {
-									whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
-										Conversation: proto.String(msg),
-									})
-								}
-								batataKernel.ReportMediaStored(mtype, mediaID, replyFunc)
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if msgText != "" {
-			err := historyStore.SaveMessage(v.Info.ID, v.Info.Chat.String(), v.Info.Sender.String(), msgText, v.Info.Timestamp, v.Info.IsFromMe)
-			if err != nil {
-				fmt.Printf("Failed to save message to history: %v\n", err)
-			}
-		}
-
-		// Check if the message is sent to self (Note to Self)
-		if v.Info.IsFromMe && v.Info.Chat.User == v.Info.Sender.User {
-			fmt.Println("it's you - triggering workflow")
-
-			fmt.Printf("DEBUG: Message Struct: %+v\n", v.Message)
-			if msgText != "" {
-				// Ignore messages starting with BotPrefix
-				if len(msgText) >= len(BotPrefix) && msgText[:len(BotPrefix)] == BotPrefix {
-					fmt.Println("Ignoring bot message")
-					return
-				}
-
-				// Handle "LET IT BE" override for watcher-blocked messages
-				if msgText == "LET IT BE" {
-					if lastWithheldMessage != nil {
-						fmt.Println("[LET IT BE] Overriding watcher block - sending withheld message")
-						lastWithheldMessage.SendFunc(lastWithheldMessage.Message)
-						lastWithheldMessage = nil
-						// Send confirmation
-						if whatsAppClient != nil {
-							whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
-								Conversation: proto.String("[Blady][Watcher] : Message sent."),
-							})
-						}
-					} else {
-						fmt.Println("[LET IT BE] No withheld message to send")
-						if whatsAppClient != nil {
-							whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
-								Conversation: proto.String("[Blady][Watcher] : No blocked message to release."),
-							})
-						}
-					}
-					return
-				}
-
-				fmt.Printf("DEBUG: Extracted text: %s\n", msgText)
-				// Start workflow in background, managed by ConversationManager
-				chatID := v.Info.Chat.String()
-
-				// BATATA INTERCEPTION
-				// Self-chat messages are passed to Batata first.
-				// We need a reply function.
-				replyFunc := func(msg string) {
-					if whatsAppClient != nil {
-						_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
-							Conversation: proto.String(msg),
-						})
-						if err != nil {
-							fmt.Printf("Failed to send Batata message: %v\n", err)
-						}
-					}
-				}
-				killFunc := func() {
-					fmt.Println("Batata requested kill. Exiting...")
-					os.Exit(0)
-				}
-
-				if batataKernel.HandleMessage(msgText, v.Info.Sender, v.Info.Chat, replyFunc, killFunc) {
-					// Message handled by Batata, refresh LLM if config changed or just return
-					// Ideally we check if config changed, but for now we can just lazily reload or rely on explicit actions.
-					// If the user changed the brain, we should update the llmClient and taskBot.
-					// We can do this by checking if the state returned to Idle from a change state, or just re-init always on "Back to Blady".
-					// But HandleMessage returns true even for intermediate steps.
-					// Let's just return for now.
-					// If the user *just* finished config (HandleMessage returned true, but State went to Idle),
-					// we might want to ensure 'llmClient' is up to date for the next message.
-					// We can re-init LLM client here if needed?
-					// It's safer to re-init on demand or check a "Dirty" flag.
-					// For simplicity, we'll re-init LLM client if Batata is IDLE after handling (meaning it exited a menu).
-					if batataKernel.State == batata.StateIdle {
-						reinitLLM(v.Info.Chat)
-					}
-					return
-				}
-
-				// Normal Note-to-Self Workflow
-				convManager.StartWorkflow(chatID, func(ctx context.Context) {
-					sendFunc := func(msg string) {
-						if whatsAppClient != nil {
-							resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
-								Conversation: proto.String(msg),
-							})
-							if err != nil {
-								fmt.Printf("Failed to send message: %v\n", err)
-							} else {
-								// START FIX: Save bot response to history
-								// We need to save the bot's response as well so it appears in future context.
-								// It is "FromMe" in the sense that the bot sends it on my behalf?
-								// Technically yes, we send it via 'SendMessage'.
-								// So 'isFromMe' = true.
-								// We should probably construct it safely.
-								// Note: The timestamp will be 'now'.
-								// Use resp.ID for uniqueness.
-								err := historyStore.SaveMessage(resp.ID, v.Info.Chat.String(), v.Info.Sender.String(), msg, time.Now(), true)
-								if err != nil {
-									fmt.Printf("Failed to save bot response to history: %v\n", err)
-								}
-								// END FIX
-							}
-						}
-					}
-
-					// Fetch context (last 9 messages)
-					contextMsgs, err := historyStore.GetRecentMessages(chatID, 9)
-					if err != nil {
-						fmt.Printf("Failed to get recent messages: %v\n", err)
-						contextMsgs = []string{} // Fallback
-					}
-
-					fmt.Printf("DEBUG: Context Messages: %v\n", contextMsgs)
-
-					sendMasterFunc := func(msg string) {
-						// For "Note to Self" (User == Sender.User), message_master is just a response back to the chat.
-						// But specifically, we can ensure it goes to the user.
-						// In this context, v.Info.Chat is the user's chat.
-						if whatsAppClient != nil {
-							// We can prefix it to distinguish slightly if we want, or rely on normal sending.
-							// The SendFunc above prefixes with '[Blady] : '.
-							// If 'message_master' is meant to be private, it's already private in "Note to Self".
-							// If we are in a group, this should go to a private chat with the user.
-							// But v.Info.Chat might be a group.
-							// So we should construct a JID for the user.
-
-							// v.Info.Sender is the JID of the sender.
-							// If v.Info.IsFromMe, Sender is us. Wait.
-							// If I (me) send a note to self, v.Info.Sender is My JID. v.Info.Chat is My JID (as User).
-							// So targeting v.Info.Sender is correct for replying to the "Master".
-							// We use ToNonAD() to ensure we don't include device part, which SendMessage rejects.
-
-							targetJID := v.Info.Sender.ToNonAD()
-
-							_, err := whatsAppClient.SendMessage(context.Background(), targetJID, &waProto.Message{
-								Conversation: proto.String(msg),
-							})
-							if err != nil {
-								fmt.Printf("Failed to send master message: %v\n", err)
-							}
-						}
-					}
-
-					wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback, batataKernel, searchContacts)
-					wf.Run(ctx, msgText, contextMsgs)
-				})
-			} else {
-				fmt.Println("DEBUG: No text found in message")
-			}
-		} else {
-			// Not a self-message - always ignore messages from me in other chats to avoid echo
-			if v.Info.IsFromMe {
-				fmt.Println("Ignoring my own message in non-self conversation")
-				return
-			}
-
-			chatJID := v.Info.Chat.String()
-
-			if msgText != "" && taskBot != nil {
-				// 1. Check for Active Behaviors
-				activeBehaviors, err := taskBot.BehaviorManager.GetActiveBehaviors(chatJID)
-				if err != nil {
-					fmt.Printf("Error checking behaviors: %v\n", err)
-				} else if len(activeBehaviors) > 0 {
-					fmt.Printf("Active behaviors found for %s: %d\n", chatJID, len(activeBehaviors))
-
-					go func(cJID string, behaviors []behaviors.Behavior) {
-						// Debounce 5s
-						time.Sleep(5 * time.Second)
-
-						// Lock per contact for behaviors
-						lockKey := fmt.Sprintf("behavior:%s", cJID)
-						taskLocks.Lock(lockKey)
-						defer taskLocks.Unlock(lockKey)
-
-						// Fetch new messages (simple fetch last 10 for now or track timestamp?)
-						// Behaviors are stateless streams usually, but we should track what we processed.
-						// But Behavior struct doesn't have LastProcessedTimestamp.
-						// Creating one implies saving state which we avoided for now.
-						// We'll just fetch *Recent* messages (last 10) including the one that triggered this.
-						// AND assume the LLM handles context duplication.
-						// Ideally we'd have a cursor. But prompt injection is "stateless" per turn.
-
-						// Context: Get recent messages
-						contextMsgs, err := historyStore.GetRecentMessages(cJID, 10)
-						if err != nil {
-							fmt.Printf("Failed to get context for behaviors: %v\n", err)
-							return
-						}
-
-						// We use the *latest* message as the primary trigger?
-						// Or we pass the whole context?
-						// ProcessBehaviors takes (activeBehaviors, msg, context, sendToContact)
-						// We'll pass "" as msg and let context carry the conversation, OR pass the very last message.
-						// Let's pass the last message as 'msg' if we can extract it, but GetRecentMessages returns strings.
-						// Better: Pass empty msg and full context. The prompt template usually puts context in {{.Context}}.
-						// The 'Message' field in ModeData is often the *new* input.
-						// If we pass empty, the LLM relies on context.
-
-						// Let's try to get the actual text of the latest message for 'msg'.
-						latestText := ""
-						if len(contextMsgs) > 0 {
-							latestText = contextMsgs[len(contextMsgs)-1]
-						}
-
-						sendToContact := func(msg string) {
-							if whatsAppClient != nil {
-								contactJID, _ := types.ParseJID(cJID)
-								resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
-									Conversation: proto.String(msg),
-								})
-								if err != nil {
-									fmt.Printf("Failed to send behavior message: %v\n", err)
+								if msgText != "" {
+									msgText += "\n" + mediaRef
 								} else {
-									historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
+									msgText = mediaRef
+								}
+
+								// Report to user in self-chat
+								if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
+									selfJID := whatsAppClient.Store.ID.ToNonAD()
+									replyFunc := func(msg string) {
+										whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
+											Conversation: proto.String(msg),
+										})
+									}
+									batataKernel.ReportMediaStored(mtype, mediaID, replyFunc)
 								}
 							}
 						}
-
-						// Process
-						_, err = taskBot.ProcessBehaviors(behaviors, latestText, contextMsgs, sendToContact)
-						if err != nil {
-							fmt.Printf("Behavior processing failed: %v\n", err)
-						}
-
-					}(chatJID, activeBehaviors)
+					}
 				}
+			}
 
-				// 2. Check for Task
-				// Check by both chat ID and contact for task matching
-				// Check by both chat ID and contact for task matching
-				fmt.Printf("DEBUG: Checking for task with chat ID: %s\n", chatJID)
-				task, err := taskBot.TaskManager.GetTaskByContact(chatJID)
+			if msgText != "" {
+				err := historyStore.SaveMessage(v.Info.ID, v.Info.Chat.String(), v.Info.Sender.String(), msgText, v.Info.Timestamp, v.Info.IsFromMe)
 				if err != nil {
-					fmt.Printf("Error checking for task: %v\n", err)
-				} else if task != nil {
-					// Found active task - route incoming message from contact to task mode
-					fmt.Printf("Active task %d found for chat %s - routing to task mode\n", task.ID, chatJID)
+					fmt.Printf("Failed to save message to history: %v\n", err)
+				}
+			}
 
-					// Update ChatID if it changed (e.g., bot responded from different JID)
-					if task.ChatID != chatJID {
-						if err := taskBot.TaskManager.SetTaskChatID(task.ID, chatJID); err != nil {
-							fmt.Printf("Failed to update task chat ID: %v\n", err)
-						}
+			// Check if the message is sent to self (Note to Self)
+			if isSelfChat {
+				fmt.Println("it's you - triggering workflow")
+
+				fmt.Printf("DEBUG: Message Struct: %+v\n", v.Message)
+				if msgText != "" {
+					// Ignore messages starting with BotPrefix
+					if len(msgText) >= len(BotPrefix) && msgText[:len(BotPrefix)] == BotPrefix {
+						fmt.Println("Ignoring bot message")
+						return
 					}
 
-					// Route to task mode with DEBOUNCE and LOCKING
-					// 1. Wait 5s
-					// 2. Lock task
-					// 3. Fetch new messages
-					// 4. Process
-					go func(tID int, cJID string) {
-						// 1. Delay
-						// fmt.Printf("Task %d: Waiting 5s before processing...\n", tID)
-						time.Sleep(5 * time.Second)
-
-						// 2. Lock
-						lockKey := fmt.Sprintf("task:%d", tID)
-						taskLocks.Lock(lockKey)
-						defer taskLocks.Unlock(lockKey)
-
-						// fmt.Printf("Task %d: Acquired lock, processing...\n", tID)
-
-						// 3. Reload Task to get latest timestamp safely
-						// We need to reload because another goroutine might have updated it
-						currentTask, err := taskBot.TaskManager.LoadTask(tID)
-						if err != nil {
-							fmt.Printf("Failed to reload task %d: %v\n", tID, err)
-							return
+					// Handle "LET IT BE" override for watcher-blocked messages
+					if msgText == "LET IT BE" {
+						if lastWithheldMessage != nil {
+							fmt.Println("[LET IT BE] Overriding watcher block - sending withheld message")
+							lastWithheldMessage.SendFunc(lastWithheldMessage.Message)
+							lastWithheldMessage = nil
+							// Send confirmation
+							if whatsAppClient != nil {
+								whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									Conversation: proto.String("[Blady][Watcher] : Message sent."),
+								})
+							}
+						} else {
+							fmt.Println("[LET IT BE] No withheld message to send")
+							if whatsAppClient != nil {
+								whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									Conversation: proto.String("[Blady][Watcher] : No blocked message to release."),
+								})
+							}
 						}
+						return
+					}
 
-						// 4. Fetch new messages since last processed
-						// If timestamp is 0, it gets recent context. If > 0, it gets strictly new ones.
-						newMsgs, maxUnix, err := historyStore.GetMessagesSince(cJID, currentTask.LastProcessedTimestamp)
-						if err != nil {
-							fmt.Printf("Failed to get new messages for task %d: %v\n", tID, err)
-							return
+					fmt.Printf("DEBUG: Extracted text: %s\n", msgText)
+					// Start workflow in background, managed by ConversationManager
+					chatID := v.Info.Chat.String()
+
+					// BATATA INTERCEPTION
+					// Self-chat messages are passed to Batata first.
+					// We need a reply function.
+					replyFunc := func(msg string) {
+						if whatsAppClient != nil {
+							_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								Conversation: proto.String(msg),
+							})
+							if err != nil {
+								fmt.Printf("Failed to send Batata message: %v\n", err)
+							}
 						}
+					}
+					killFunc := func() {
+						fmt.Println("Batata requested kill. Exiting...")
+						os.Exit(0)
+					}
 
-						if len(newMsgs) == 0 {
-							// No new messages found?
-							// This can happen if multiple messages came in within 5s.
-							// The first one wakes up after 5s, processes ALL of them (updating timestamp).
-							// The second one wakes up, sees timestamp is now moved forward, finds 0 new messages.
-							// So we just quit.
-							// fmt.Printf("Task %d: No new messages found since %d. Skipping.\n", tID, currentTask.LastProcessedTimestamp)
-							return
+					if batataKernel.HandleMessage(msgText, v.Info.Sender, v.Info.Chat, replyFunc, killFunc) {
+						// Message handled by Batata, refresh LLM if config changed or just return
+						// Ideally we check if config changed, but for now we can just lazily reload or rely on explicit actions.
+						// If the user changed the brain, we should update the llmClient and taskBot.
+						// We can do this by checking if the state returned to Idle from a change state, or just re-init always on "Back to Blady".
+						// But HandleMessage returns true even for intermediate steps.
+						// Let's just return for now.
+						// If the user *just* finished config (HandleMessage returned true, but State went to Idle),
+						// we might want to ensure 'llmClient' is up to date for the next message.
+						// We can re-init LLM client here if needed?
+						// It's safer to re-init on demand or check a "Dirty" flag.
+						// For simplicity, we'll re-init LLM client if Batata is IDLE after handling (meaning it exited a menu).
+						if batataKernel.State == batata.StateIdle {
+							reinitLLM(v.Info.Chat)
 						}
+						return
+					}
 
-						fmt.Printf("Task %d: Processing %d new messages...\n", tID, len(newMsgs))
-
-						// contextMsgs for the LLM can be just the new ones, OR we provide some history + new ones.
-						// The bot.ProcessTask uses 'context []string' and 'msg string'.
-						// The 'msg' is usually the single prompt.
-						// Now 'msg' should probably be the BLOCK of new messages.
-						// And 'context' could be empty if we rely on the block, OR we still provide older history?
-						// Bot logic: "Context: ... \n Message: ..."
-						// If we pass many messages in Message, it works fine.
-						// Let's pass the joined new messages as 'msg'.
-						// And for 'context', maybe we still want *previous* context?
-						// It's safer to get some *older* history as context if the new block is small.
-						// But 'GetMessagesSince' returns the *full* text of the messages.
-						// The LLM treats 'context' as history.
-						// If we are incrementally processing, the LLM maintains state via 'memories'.
-						// But short-term conversational context is 'context'.
-						// If we don't pass 'context', it might lose track of the immediately preceding turn if it wasn't in the new block.
-						// Let's fetch the *last 10 messages* overall as context, just in case.
-						// BUT we must be careful not to duplicate what's in 'msg'.
-						// Actually, simplicity: Just pass the new messages block as 'msg'.
-						// The LLM should be able to handle "Here are new messages: [A, B, C]".
-						// Memories handle long term.
-
-						combinedMsg := strings.Join(newMsgs, "\n")
-
-						// Send function for task conversation (no [Blady] prefix)
-						sendToContact := func(msg string) {
+					// Normal Note-to-Self Workflow
+					convManager.StartWorkflow(chatID, func(ctx context.Context) {
+						sendFunc := func(msg string) {
 							if whatsAppClient != nil {
 								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
 									Conversation: proto.String(msg),
 								})
 								if err != nil {
-									fmt.Printf("Failed to send task message: %v\n", err)
+									fmt.Printf("Failed to send message: %v\n", err)
 								} else {
-									err := historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
+									// START FIX: Save bot response to history
+									// We need to save the bot's response as well so it appears in future context.
+									// It is "FromMe" in the sense that the bot sends it on my behalf?
+									// Technically yes, we send it via 'SendMessage'.
+									// So 'isFromMe' = true.
+									// We should probably construct it safely.
+									// Note: The timestamp will be 'now'.
+									// Use resp.ID for uniqueness.
+									err := historyStore.SaveMessage(resp.ID, v.Info.Chat.String(), v.Info.Sender.String(), msg, time.Now(), true)
 									if err != nil {
-										fmt.Printf("Failed to save task response to history: %v\n", err)
+										fmt.Printf("Failed to save bot response to history: %v\n", err)
 									}
+									// END FIX
 								}
 							}
 						}
 
-						// Setup button response for this execution
-						chatJIDForContext := v.Info.Chat.String()
-						taskBot.SendButtonResponseFunc = func(displayText, buttonID string) {
-							if whatsAppClient != nil {
-								if buttonID == "" {
-									if rd, rb, found := buttonManager.Resolve(chatJIDForContext, displayText); found {
-										displayText = rd
-										buttonID = rb
-									}
-								}
-								msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatJIDForContext, displayText, buttonID)
-								if err != nil {
-									fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
-									whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
-								} else {
-									historyStore.SaveMessage(msgID, cJID, "Me", displayText, time.Now(), true)
-								}
-							}
-						}
-
-						// Process
-						_, err = taskBot.ProcessTask(currentTask, combinedMsg, []string{}, sendToContact)
+						// Fetch context (last 9 messages)
+						contextMsgs, err := historyStore.GetRecentMessages(chatID, 9)
 						if err != nil {
-							fmt.Printf("Task processing failed: %v\n", err)
+							fmt.Printf("Failed to get recent messages: %v\n", err)
+							contextMsgs = []string{} // Fallback
 						}
 
-						// 5. Update timestamp
-						if err := taskBot.TaskManager.SetTaskProcessedTimestamp(tID, maxUnix); err != nil {
-							fmt.Printf("Failed to update task timestamp: %v\n", err)
+						fmt.Printf("DEBUG: Context Messages: %v\n", contextMsgs)
+
+						sendMasterFunc := func(msg string) {
+							// For "Note to Self" (User == Sender.User), message_master is just a response back to the chat.
+							// But specifically, we can ensure it goes to the user.
+							// In this context, v.Info.Chat is the user's chat.
+							if whatsAppClient != nil {
+								// We can prefix it to distinguish slightly if we want, or rely on normal sending.
+								// The SendFunc above prefixes with '[Blady] : '.
+								// If 'message_master' is meant to be private, it's already private in "Note to Self".
+								// If we are in a group, this should go to a private chat with the user.
+								// But v.Info.Chat might be a group.
+								// So we should construct a JID for the user.
+
+								// v.Info.Sender is the JID of the sender.
+								// If v.Info.IsFromMe, Sender is us. Wait.
+								// If I (me) send a note to self, v.Info.Sender is My JID. v.Info.Chat is My JID (as User).
+								// So targeting v.Info.Sender is correct for replying to the "Master".
+								// We use ToNonAD() to ensure we don't include device part, which SendMessage rejects.
+
+								targetJID := v.Info.Sender.ToNonAD()
+
+								_, err := whatsAppClient.SendMessage(context.Background(), targetJID, &waProto.Message{
+									Conversation: proto.String(msg),
+								})
+								if err != nil {
+									fmt.Printf("Failed to send master message: %v\n", err)
+								}
+							}
 						}
 
-					}(task.ID, chatJID)
+						wf := workflows.NewCommandWorkflow(llmClient, sendFunc, sendMasterFunc, getAllContactsJSON(whatsAppClient), taskBot.StartTaskCallback, batataKernel, searchContacts)
+						wf.Run(ctx, msgText, contextMsgs)
+					})
+				} else {
+					fmt.Println("DEBUG: No text found in message")
+				}
+			} else {
+				// Not a self-message - always ignore messages from me in other chats to avoid echo
+				if v.Info.IsFromMe {
+					fmt.Println("Ignoring my own message in non-self conversation")
+					return
+				}
 
+				chatJID := v.Info.Chat.String()
+
+				if msgText != "" && taskBot != nil {
+					// 1. Check for Active Behaviors
+					activeBehaviors, err := taskBot.BehaviorManager.GetActiveBehaviors(chatJID)
+					if err != nil {
+						fmt.Printf("Error checking behaviors: %v\n", err)
+					} else if len(activeBehaviors) == 0 && !v.Info.IsGroup && !v.Info.MessageSource.SenderAlt.IsEmpty() {
+						// Fallback for LID/JID ambiguity in 1:1 chats
+						altJID := v.Info.MessageSource.SenderAlt.String()
+						activeBehaviors, err = taskBot.BehaviorManager.GetActiveBehaviors(altJID)
+					}
+
+					if err == nil && len(activeBehaviors) > 0 {
+						fmt.Printf("Active behaviors found for %s: %d\n", chatJID, len(activeBehaviors))
+
+						go func(cJID string, behaviors []behaviors.Behavior) {
+							// Debounce 5s
+							time.Sleep(5 * time.Second)
+
+							// Lock per contact for behaviors
+							lockKey := fmt.Sprintf("behavior:%s", cJID)
+							taskLocks.Lock(lockKey)
+							defer taskLocks.Unlock(lockKey)
+
+							// Fetch new messages (simple fetch last 10 for now or track timestamp?)
+							// Behaviors are stateless streams usually, but we should track what we processed.
+							// But Behavior struct doesn't have LastProcessedTimestamp.
+							// Creating one implies saving state which we avoided for now.
+							// We'll just fetch *Recent* messages (last 10) including the one that triggered this.
+							// AND assume the LLM handles context duplication.
+							// Ideally we'd have a cursor. But prompt injection is "stateless" per turn.
+
+							// Context: Get recent messages
+							contextMsgs, err := historyStore.GetRecentMessages(cJID, 10)
+							if err != nil {
+								fmt.Printf("Failed to get context for behaviors: %v\n", err)
+								return
+							}
+
+							// We use the *latest* message as the primary trigger?
+							// Or we pass the whole context?
+							// ProcessBehaviors takes (activeBehaviors, msg, context, sendToContact)
+							// We'll pass "" as msg and let context carry the conversation, OR pass the very last message.
+							// Let's pass the last message as 'msg' if we can extract it, but GetRecentMessages returns strings.
+							// Better: Pass empty msg and full context. The prompt template usually puts context in {{.Context}}.
+							// The 'Message' field in ModeData is often the *new* input.
+							// If we pass empty, the LLM relies on context.
+
+							// Let's try to get the actual text of the latest message for 'msg'.
+							latestText := ""
+							if len(contextMsgs) > 0 {
+								latestText = contextMsgs[len(contextMsgs)-1]
+							}
+
+							sendToContact := func(msg string) {
+								if whatsAppClient != nil {
+									contactJID, _ := types.ParseJID(cJID)
+									resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+										Conversation: proto.String(msg),
+									})
+									if err != nil {
+										fmt.Printf("Failed to send behavior message: %v\n", err)
+									} else {
+										historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
+									}
+								}
+							}
+
+							// Process
+							_, err = taskBot.ProcessBehaviors(behaviors, latestText, contextMsgs, sendToContact)
+							if err != nil {
+								fmt.Printf("Behavior processing failed: %v\n", err)
+							}
+
+						}(chatJID, activeBehaviors)
+					}
+
+					// 2. Check for Task
+					// Check by both chat ID and contact for task matching
+					fmt.Printf("DEBUG: Checking for task with chat ID: %s\n", chatJID)
+					task, err := taskBot.TaskManager.GetTaskByContact(chatJID)
+					if err != nil {
+						fmt.Printf("Error checking for task: %v\n", err)
+					}
+					// Fallback for LID/JID ambiguity in 1:1 chats
+					if task == nil && !v.Info.IsGroup && !v.Info.MessageSource.SenderAlt.IsEmpty() {
+						altJID := v.Info.MessageSource.SenderAlt.String()
+						fmt.Printf("DEBUG: Task not found for %s (1:1), checking SenderAlt: %s\n", chatJID, altJID)
+						task, err = taskBot.TaskManager.GetTaskByContact(altJID)
+						if err != nil {
+							fmt.Printf("Error checking for task with SenderAlt: %v\n", err)
+						}
+					}
+
+					if task != nil {
+						// Found active task - route incoming message from contact to task mode
+						fmt.Printf("Active task %d found for chat %s - routing to task mode\n", task.ID, chatJID)
+
+						// Update ChatID if it changed (e.g., bot responded from different JID)
+						if task.ChatID != chatJID {
+							if err := taskBot.TaskManager.SetTaskChatID(task.ID, chatJID); err != nil {
+								fmt.Printf("Failed to update task chat ID: %v\n", err)
+							}
+						}
+
+						// Route to task mode with DEBOUNCE and LOCKING
+						// 1. Wait 5s
+						// 2. Lock task
+						// 3. Fetch new messages
+						// 4. Process
+						go func(tID int, cJID string) {
+							// 1. Delay
+							// fmt.Printf("Task %d: Waiting 5s before processing...\n", tID)
+							time.Sleep(5 * time.Second)
+
+							// 2. Lock
+							lockKey := fmt.Sprintf("task:%d", tID)
+							taskLocks.Lock(lockKey)
+							defer taskLocks.Unlock(lockKey)
+
+							// fmt.Printf("Task %d: Acquired lock, processing...\n", tID)
+
+							// 3. Reload Task to get latest timestamp safely
+							// We need to reload because another goroutine might have updated it
+							currentTask, err := taskBot.TaskManager.LoadTask(tID)
+							if err != nil {
+								fmt.Printf("Failed to reload task %d: %v\n", tID, err)
+								return
+							}
+
+							// 4. Fetch new messages since last processed
+							// If timestamp is 0, it gets recent context. If > 0, it gets strictly new ones.
+							newMsgs, maxUnix, err := historyStore.GetMessagesSince(cJID, currentTask.LastProcessedTimestamp)
+							if err != nil {
+								fmt.Printf("Failed to get new messages for task %d: %v\n", tID, err)
+								return
+							}
+
+							if len(newMsgs) == 0 {
+								// No new messages found?
+								// This can happen if multiple messages came in within 5s.
+								// The first one wakes up after 5s, processes ALL of them (updating timestamp).
+								// The second one wakes up, sees timestamp is now moved forward, finds 0 new messages.
+								// So we just quit.
+								// fmt.Printf("Task %d: No new messages found since %d. Skipping.\n", tID, currentTask.LastProcessedTimestamp)
+								return
+							}
+
+							fmt.Printf("Task %d: Processing %d new messages...\n", tID, len(newMsgs))
+
+							// contextMsgs for the LLM can be just the new ones, OR we provide some history + new ones.
+							// The bot.ProcessTask uses 'context []string' and 'msg string'.
+							// The 'msg' is usually the single prompt.
+							// Now 'msg' should probably be the BLOCK of new messages.
+							// And 'context' could be empty if we rely on the block, OR we still provide older history?
+							// Bot logic: "Context: ... \n Message: ..."
+							// If we pass many messages in Message, it works fine.
+							// Let's pass the joined new messages as 'msg'.
+							// And for 'context', maybe we still want *previous* context?
+							// It's safer to get some *older* history as context if the new block is small.
+							// But 'GetMessagesSince' returns the *full* text of the messages.
+							// The LLM treats 'context' as history.
+							// If we are incrementally processing, the LLM maintains state via 'memories'.
+							// But short-term conversational context is 'context'.
+							// If we don't pass 'context', it might lose track of the immediately preceding turn if it wasn't in the new block.
+							// Let's fetch the *last 10 messages* overall as context, just in case.
+							// BUT we must be careful not to duplicate what's in 'msg'.
+							// Actually, simplicity: Just pass the new messages block as 'msg'.
+							// The LLM should be able to handle "Here are new messages: [A, B, C]".
+							// Memories handle long term.
+
+							combinedMsg := strings.Join(newMsgs, "\n")
+
+							// Send function for task conversation (no [Blady] prefix)
+							sendToContact := func(msg string) {
+								if whatsAppClient != nil {
+									resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+										Conversation: proto.String(msg),
+									})
+									if err != nil {
+										fmt.Printf("Failed to send task message: %v\n", err)
+									} else {
+										err := historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
+										if err != nil {
+											fmt.Printf("Failed to save task response to history: %v\n", err)
+										}
+									}
+								}
+							}
+
+							// Setup button response for this execution
+							chatJIDForContext := v.Info.Chat.String()
+							taskBot.SendButtonResponseFunc = func(displayText, buttonID string) {
+								if whatsAppClient != nil {
+									if buttonID == "" {
+										if rd, rb, found := buttonManager.Resolve(chatJIDForContext, displayText); found {
+											displayText = rd
+											buttonID = rb
+										}
+									}
+									msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatJIDForContext, displayText, buttonID)
+									if err != nil {
+										fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
+										whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
+									} else {
+										historyStore.SaveMessage(msgID, cJID, "Me", displayText, time.Now(), true)
+									}
+								}
+							}
+
+							// Process
+							_, err = taskBot.ProcessTask(currentTask, combinedMsg, []string{}, sendToContact)
+							if err != nil {
+								fmt.Printf("Task processing failed: %v\n", err)
+							}
+
+							// 5. Update timestamp
+							if err := taskBot.TaskManager.SetTaskProcessedTimestamp(tID, maxUnix); err != nil {
+								fmt.Printf("Failed to update task timestamp: %v\n", err)
+							}
+
+						}(task.ID, chatJID)
+
+					}
+				}
+
+				if v.Message != nil && v.Message.ExtendedTextMessage != nil {
+					fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
 				}
 			}
-
-			if v.Message != nil && v.Message.ExtendedTextMessage != nil {
-				fmt.Printf("Content: %+v\n", v.Message.ExtendedTextMessage.Text)
-			}
-		}
-		fmt.Println("------------------------------------------------")
+			fmt.Println("------------------------------------------------")
+		}(v)
 	case *events.HistorySync:
 		// Handle history sync to backfill messages
 		id := v.Data.GetSyncType()

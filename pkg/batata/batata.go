@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"whatsabladerunner/pkg/transcription"
+
 	"go.mau.fi/whatsmeow/types"
 )
 
@@ -44,6 +46,7 @@ type Config struct {
 	TimeoutSeconds         int      `json:"timeout_seconds"`
 	TranscriptionServer    string   `json:"transcription_server"`
 	TranscriptionServerKey string   `json:"transcription_server_key"`
+	TranscriptionModel     string   `json:"transcription_model"`
 }
 
 type Kernel struct {
@@ -67,7 +70,8 @@ func NewKernel(configDir string) *Kernel {
 			OllamaPort:          "11434",
 			OllamaModel:         "qwen3:8b",
 			CerebrasModel:       "gpt-oss-120b",
-			TranscriptionServer: "",
+			TranscriptionServer: "http://localhost:8000",
+			TranscriptionModel:  "Systran/faster-whisper-large-v3",
 		},
 		State: StateIdle,
 	}
@@ -263,14 +267,21 @@ func (k *Kernel) HandleMessage(msgText string, senderJID, chatJID types.JID, sen
 	case StateSetupTranscription:
 		switch k.tempInputStep {
 		case 0:
-			k.Config.TranscriptionServer = cleanMsg
-			k.tempInputStep++
-			sendFunc(msg("🔑 Enter API Key / Ingrese API Key (or/o 'none'):"))
-		case 1:
-			if !strings.EqualFold(cleanMsg, "none") {
-				k.Config.TranscriptionServerKey = cleanMsg
+			if strings.EqualFold(cleanMsg, "default") {
+				k.Config.TranscriptionServer = "http://localhost:8000"
+				k.Config.TranscriptionModel = "Systran/faster-whisper-large-v3"
+				k.tempInputStep = 1 // Skip API key, or go to it? Usually local doesn't need key.
+				sendFunc(msg("🔑 Enter API Key / Ingrese API Key (or/o 'none' or/o 'default' for none):"))
 			} else {
+				k.Config.TranscriptionServer = cleanMsg
+				k.tempInputStep++
+				sendFunc(msg("🔑 Enter API Key / Ingrese API Key (or/o 'none'):"))
+			}
+		case 1:
+			if strings.EqualFold(cleanMsg, "none") || strings.EqualFold(cleanMsg, "default") {
 				k.Config.TranscriptionServerKey = ""
+			} else {
+				k.Config.TranscriptionServerKey = cleanMsg
 			}
 			sendFunc(msg(k.s(func(s Strings) string { return s.TranscriptionSaved })))
 			k.finishConfig(sendFunc)
@@ -329,6 +340,19 @@ func (k *Kernel) finishConfig(sendFunc func(string)) {
 	}
 
 	sendFunc(msg(k.s(func(s Strings) string { return s.ConfigSaved })))
+
+	// Automatically ensure transcription model is downloaded
+	if k.Config.TranscriptionServer != "" {
+		go func() {
+			fmt.Printf("[Batata] Ensuring transcription model is downloaded: %s\n", k.Config.TranscriptionModel)
+			if err := transcription.EnsureModelDownloaded(k.Config.TranscriptionServer, k.Config.TranscriptionServerKey, k.Config.TranscriptionModel); err != nil {
+				fmt.Printf("[Batata] Failed to trigger model download: %v\n", err)
+			} else {
+				fmt.Printf("[Batata] Model download triggered successfully: %s\n", k.Config.TranscriptionModel)
+			}
+		}()
+	}
+
 	sendFunc(msg(k.s(func(s Strings) string { return s.BackToBlady })))
 	k.State = StateIdle
 }

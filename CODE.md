@@ -19,7 +19,7 @@ The project is structured as a Go application with various internal packages loc
 **The Communication & Configuration Hub.**
 
 - **Purpose**: Manages the initial setup flow, language selection, and LLM configuration via WhatsApp messages. It's critical for user onboarding and system configuration.
-- **Main Types**: `Kernel` (state manager), `Config` (persistent settings).
+- **Main Types**: `Kernel` (state manager), `Config` (persistent settings including LLM and Transcription).
 - **Core Logic**: `HandleMessage` processes step-by-step setup interactions.
 
 #### [`pkg/bot`](./pkg/bot)
