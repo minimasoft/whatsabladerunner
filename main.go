@@ -15,10 +15,8 @@ import (
 	"github.com/mdp/qrterminal/v3"
 
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
-	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -37,6 +35,7 @@ import (
 	"whatsabladerunner/pkg/ollama"
 	"whatsabladerunner/pkg/tasks"
 	"whatsabladerunner/pkg/transcription"
+	"whatsabladerunner/pkg/whatsapp"
 	"whatsabladerunner/workflows"
 )
 
@@ -264,7 +263,7 @@ func eventHandler(evt interface{}) {
 								if mtype == "audio" && batataKernel.Config.TranscriptionServer != "" {
 									fmt.Println("Start transcription...")
 									if isSelfChat && whatsAppClient != nil && whatsAppClient.Store.ID != nil {
-										whatsAppClient.SendMessage(context.Background(), whatsAppClient.Store.ID.ToNonAD(), &waProto.Message{
+										whatsapp.SendWithStealth(context.Background(), whatsAppClient, whatsAppClient.Store.ID.ToNonAD(), &waProto.Message{
 											Conversation: proto.String("🎙️ Transcribing audio..."),
 										})
 									}
@@ -292,7 +291,7 @@ func eventHandler(evt interface{}) {
 								if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
 									selfJID := whatsAppClient.Store.ID.ToNonAD()
 									replyFunc := func(msg string) {
-										whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
+										whatsapp.SendWithStealth(context.Background(), whatsAppClient, selfJID, &waProto.Message{
 											Conversation: proto.String(msg),
 										})
 									}
@@ -331,14 +330,14 @@ func eventHandler(evt interface{}) {
 							lastWithheldMessage = nil
 							// Send confirmation
 							if whatsAppClient != nil {
-								whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{
 									Conversation: proto.String("[Blady][Watcher] : Message sent."),
 								})
 							}
 						} else {
 							fmt.Println("[LET IT BE] No withheld message to send")
 							if whatsAppClient != nil {
-								whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{
 									Conversation: proto.String("[Blady][Watcher] : No blocked message to release."),
 								})
 							}
@@ -355,7 +354,7 @@ func eventHandler(evt interface{}) {
 					// We need a reply function.
 					replyFunc := func(msg string) {
 						if whatsAppClient != nil {
-							_, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+							_, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{
 								Conversation: proto.String(msg),
 							})
 							if err != nil {
@@ -390,7 +389,7 @@ func eventHandler(evt interface{}) {
 					convManager.StartWorkflow(chatID, func(ctx context.Context) {
 						sendFunc := func(msg string) {
 							if whatsAppClient != nil {
-								resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+								resp, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{
 									Conversation: proto.String(msg),
 								})
 								if err != nil {
@@ -442,7 +441,7 @@ func eventHandler(evt interface{}) {
 
 								targetJID := v.Info.Sender.ToNonAD()
 
-								_, err := whatsAppClient.SendMessage(context.Background(), targetJID, &waProto.Message{
+								_, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, targetJID, &waProto.Message{
 									Conversation: proto.String(msg),
 								})
 								if err != nil {
@@ -522,7 +521,7 @@ func eventHandler(evt interface{}) {
 							sendToContact := func(msg string) {
 								if whatsAppClient != nil {
 									contactJID, _ := types.ParseJID(cJID)
-									resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+									resp, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, contactJID, &waProto.Message{
 										Conversation: proto.String(msg),
 									})
 									if err != nil {
@@ -641,14 +640,13 @@ func eventHandler(evt interface{}) {
 							// Send function for task conversation (no [Blady] prefix)
 							sendToContact := func(msg string) {
 								if whatsAppClient != nil {
-									resp, err := whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
+									resp, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{
 										Conversation: proto.String(msg),
 									})
 									if err != nil {
 										fmt.Printf("Failed to send task message: %v\n", err)
 									} else {
-										err := historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true)
-										if err != nil {
+										if err := historyStore.SaveMessage(resp.ID, cJID, "Me", msg, time.Now(), true); err != nil {
 											fmt.Printf("Failed to save task response to history: %v\n", err)
 										}
 									}
@@ -668,7 +666,7 @@ func eventHandler(evt interface{}) {
 									msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatJIDForContext, displayText, buttonID)
 									if err != nil {
 										fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
-										whatsAppClient.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
+										whatsapp.SendWithStealth(context.Background(), whatsAppClient, v.Info.Chat, &waProto.Message{Conversation: proto.String(displayText)})
 									} else {
 										historyStore.SaveMessage(msgID, cJID, "Me", displayText, time.Now(), true)
 									}
@@ -822,7 +820,7 @@ func main() {
 		if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
 			// Get own JID for self-chat
 			ownJID := whatsAppClient.Store.ID.ToNonAD()
-			_, err := whatsAppClient.SendMessage(context.Background(), ownJID, &waProto.Message{
+			_, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, ownJID, &waProto.Message{
 				Conversation: proto.String(msg),
 			})
 			if err != nil {
@@ -871,7 +869,7 @@ func main() {
 		// Create send function for this contact
 		sendToContact := func(msg string) {
 			if whatsAppClient != nil {
-				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+				resp, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, contactJID, &waProto.Message{
 					Conversation: proto.String(msg),
 				})
 				if err != nil {
@@ -899,7 +897,7 @@ func main() {
 				msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, contactChatID, displayText, buttonID)
 				if err != nil {
 					fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
-					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{Conversation: proto.String(displayText)})
+					whatsapp.SendWithStealth(context.Background(), whatsAppClient, contactJID, &waProto.Message{Conversation: proto.String(displayText)})
 				} else {
 					historyStore.SaveMessage(msgID, task.Contact, "Me", displayText, time.Now(), true)
 				}
@@ -934,7 +932,7 @@ func main() {
 		// Create send function
 		sendToContact := func(msg string) {
 			if whatsAppClient != nil {
-				resp, err := whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{
+				resp, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, contactJID, &waProto.Message{
 					Conversation: proto.String(msg),
 				})
 				if err != nil {
@@ -959,7 +957,7 @@ func main() {
 				msgID, err := buttonManager.SendResponse(context.Background(), whatsAppClient, chatID, displayText, buttonID)
 				if err != nil {
 					fmt.Printf("[ButtonResponse] Failed (Task), falling back to text: %v\n", err)
-					whatsAppClient.SendMessage(context.Background(), contactJID, &waProto.Message{Conversation: proto.String(displayText)})
+					whatsapp.SendWithStealth(context.Background(), whatsAppClient, contactJID, &waProto.Message{Conversation: proto.String(displayText)})
 				} else {
 					historyStore.SaveMessage(msgID, chatID, "Me", displayText, time.Now(), true)
 				}
@@ -1015,15 +1013,14 @@ func main() {
 	// Actually, the Platform field in deviceStore might be "stored" but the payload matters more for the session.
 	// Let's rely on the payload override.
 
-	// Configure Identification
-	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
-	store.DeviceProps.Os = proto.String("Windows")
-	// SetOSInfo updates BaseClientPayload.UserAgent.OsVersion and OsBuildNumber
-	store.SetOSInfo("Windows", [3]uint32{10, 0, 19045})
-
-	// Customize other payload fields
-	store.BaseClientPayload.UserAgent.Manufacturer = proto.String("Microsoft")
-	store.BaseClientPayload.UserAgent.Device = proto.String("Windows")
+	// Configure Identification to avoid fingerprinting
+	var seed string
+	if deviceStore.ID != nil {
+		seed = deviceStore.ID.User
+	}
+	sig := whatsapp.GetSignatureForSeed(seed)
+	whatsapp.ApplySignature(sig)
+	fmt.Printf("Using browser signature: %s on %s\n", sig.PlatformType.String(), sig.OS)
 
 	if client.Store.ID == nil {
 		// No ID stored, new login
@@ -1056,7 +1053,7 @@ func main() {
 	if client.Store.ID != nil {
 		selfJID := client.Store.ID.ToNonAD()
 		sendToSelf := func(msg string) {
-			client.SendMessage(context.Background(), selfJID, &waProto.Message{
+			whatsapp.SendWithStealth(context.Background(), client, selfJID, &waProto.Message{
 				Conversation: proto.String(msg),
 			})
 		}
@@ -1296,7 +1293,7 @@ func reinitLLM(notifyJID types.JID) {
 			// Send to Self (User)
 			if whatsAppClient != nil && whatsAppClient.Store.ID != nil {
 				selfJID := whatsAppClient.Store.ID.ToNonAD()
-				whatsAppClient.SendMessage(context.Background(), selfJID, &waProto.Message{
+				whatsapp.SendWithStealth(context.Background(), whatsAppClient, selfJID, &waProto.Message{
 					Conversation: proto.String(msg),
 				})
 			}
@@ -1376,7 +1373,7 @@ func reinitLLM(notifyJID types.JID) {
 			// Small delay to ensure previous Batata messages are sent first if this was triggered by exiting Batata
 			time.Sleep(500 * time.Millisecond)
 			if whatsAppClient != nil {
-				_, err := whatsAppClient.SendMessage(context.Background(), notifyJID, &waProto.Message{
+				_, err := whatsapp.SendWithStealth(context.Background(), whatsAppClient, notifyJID, &waProto.Message{
 					Conversation: proto.String(msgText),
 				})
 				if err != nil {
@@ -1496,7 +1493,7 @@ func sendMedia(chatJID string, mediaID int64) {
 		}
 	}
 
-	_, err = whatsAppClient.SendMessage(context.Background(), target, msg)
+	_, err = whatsapp.SendWithStealth(context.Background(), whatsAppClient, target, msg)
 	if err != nil {
 		fmt.Printf("Failed to send media message to %s: %v\n", target, err)
 	} else {

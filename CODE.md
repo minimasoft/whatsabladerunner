@@ -90,6 +90,13 @@ The project is structured as a Go application with various internal packages loc
 
 - **Purpose**: Primitives for building multi-step, stateful workflows that can be managed per conversation.
 
+#### [`pkg/whatsapp`](./pkg/whatsapp)
+
+**WhatsApp Client Utilities.**
+
+- **Purpose**: Manages WhatsApp-specific configurations like browser signatures and device properties to avoid fingerprinting.
+- **Features**: Provides a pool of common browser-OS signatures that are consistently applied based on the device identity.
+
 ---
 
 ## Technical Flow

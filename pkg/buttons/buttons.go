@@ -12,6 +12,8 @@ import (
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
+
+	"whatsabladerunner/pkg/whatsapp"
 )
 
 // ButtonsContext stores the context needed for button responses
@@ -100,7 +102,7 @@ func (m *Manager) SendResponse(ctx context.Context, client *whatsmeow.Client, ch
 	target := btnCtx.ChatJID
 
 	protoMsg := &waProto.Message{
-		Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"),
+		// Conversation: proto.String("\t\t\t\t\t\t\t\t\t\t"), // REMOVED: Suspicious fingerprint
 		MessageContextInfo: &waProto.MessageContextInfo{
 			DeviceListMetadataVersion: proto.Int32(2),
 			DeviceListMetadata: &waProto.DeviceListMetadata{
@@ -129,13 +131,13 @@ func (m *Manager) SendResponse(ctx context.Context, client *whatsmeow.Client, ch
 	fmt.Printf("[ButtonResponse] Sending Mirror Response (V4): Dest=%s, Part=%s, StanzaID=%s\n",
 		target, partPN, btnCtx.MessageID)
 
-	resp, err := client.SendMessage(ctx, target, protoMsg)
+	resp, err := whatsapp.SendWithStealth(ctx, client, target, protoMsg)
 	if err != nil {
 		fmt.Printf("[ButtonResponse] Failed with Dest=%s: %v\n", target, err)
 		if target.String() != btnCtx.SenderAlt.String() && !btnCtx.SenderAlt.IsEmpty() {
 			targetPN := btnCtx.SenderAlt
 			fmt.Printf("[ButtonResponse] Retry with Dest=PN: %s\n", targetPN)
-			resp, err = client.SendMessage(ctx, targetPN, protoMsg)
+			resp, err = whatsapp.SendWithStealth(ctx, client, targetPN, protoMsg)
 			if err != nil {
 				return "", fmt.Errorf("failed after PN retry: %w", err)
 			}
