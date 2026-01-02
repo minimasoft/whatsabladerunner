@@ -3,7 +3,7 @@ module whatsabladerunner
 go 1.25.5
 
 require (
-	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/mdp/qrterminal/v3 v3.2.1
 	go.mau.fi/whatsmeow v0.0.0-20251217143725-11cf47c62d32
 	google.golang.org/protobuf v1.36.11
